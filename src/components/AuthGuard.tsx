@@ -10,6 +10,11 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!auth) {
+      setLoading(false);
+      return;
+    }
+    
     return onAuthStateChanged(auth, (user) => {
       if (!user) router.push("/login");
       else setLoading(false);

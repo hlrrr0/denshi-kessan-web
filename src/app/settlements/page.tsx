@@ -10,6 +10,11 @@ export default function SettlementsPage() {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!db) {
+        setLoading(false);
+        return;
+      }
+      
       try {
         const q = query(
           collection(db, "subscriptions"),
