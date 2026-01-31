@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Firebase Admin SDK & Migration
+scripts/migration/serviceAccountKey.json
+scripts/migration/*.json
+migration-data/
