@@ -1,6 +1,9 @@
+import Header from "@/components/Header";
+
 export default function Home() {
   return (
     <div className="min-h-screen bg-white">
+      <Header />
       <main className="container mx-auto px-4 py-16">
         <h1 className="text-4xl font-bold mb-8">電子決算公告システム</h1>
         <div className="space-y-6">

@@ -12,8 +12,11 @@
     "migrate:pdfs": "node scripts/migration/migrate-pdfs.js"
   },
   "dependencies": {
+    "@payjp/payjpv2": "^1.0.5",
+    "@payjp/payments-js": "^1.1.1",
     "firebase": "^12.8.0",
     "next": "^16.1.6",
+    "payjp": "^3.0.0",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },

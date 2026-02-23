@@ -1,0 +1,76 @@
+import { NextResponse } from "next/server";
+import { doc, updateDoc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+
+// Pay.jpのSDKをインポート
+const payjp = require("payjp")(process.env.PAYJP_SECRET_KEY);
+
+export async function POST(request: Request) {
+  try {
+    const { token, userId } = await request.json();
+
+    if (!token || !userId) {
+      return NextResponse.json(
+        { error: "Token and userId are required" },
+        { status: 400 }
+      );
+    }
+
+    // Pay.jpでカスタマーを作成または取得
+    const userDocRef = doc(db!, "users", userId);
+    const userDoc = await getDoc(userDocRef);
+
+    let customerId = userDoc.data()?.payjpCustomerId;
+
+    if (!customerId) {
+      // 新規カスタマーを作成
+      const customer = await payjp.customers.create({
+        card: token,
+        description: `User: ${userId}`,
+      });
+      customerId = customer.id;
+      
+      // FirestoreにカスタマーIDを保存
+      await updateDoc(userDocRef, {
+        payjpCustomerId: customerId,
+        payjpCardId: customer.default_card,
+        updatedAt: new Date(),
+      });
+
+      return NextResponse.json({
+        success: true,
+        customerId: customerId,
+        cardId: customer.default_card,
+      });
+    } else {
+      // 既存カスタマーのカードを更新
+      const customer = await payjp.customers.retrieve(customerId);
+      
+      // 既存のカードを削除
+      if (customer.default_card) {
+        await payjp.customers.deleteCard(customerId, customer.default_card);
+      }
+
+      // 新しいカードを追加
+      const card = await payjp.customers.createCard(customerId, { card: token });
+
+      // Firestoreを更新
+      await updateDoc(userDocRef, {
+        payjpCardId: card.id,
+        updatedAt: new Date(),
+      });
+
+      return NextResponse.json({
+        success: true,
+        customerId: customerId,
+        cardId: card.id,
+      });
+    }
+  } catch (error: any) {
+    console.error("Card registration error:", error);
+    return NextResponse.json(
+      { error: "Card registration failed", details: error.message },
+      { status: 500 }
+    );
+  }
+}

@@ -68,22 +68,60 @@ service cloud.firestore {
 4. ロケーション: Firestoreと同じ `asia-northeast1`
 5. 「完了」をクリック
 
-### Storageセキュリティルールの設定
+### ⚠️ 重要: Storageセキュリティルールの設定（必須）
 
-Storageの「ルール」タブで以下を設定：
+**この設定を行わないと、ファイルアップロードでCORSエラーが発生します！**
+
+#### 手順：
+
+1. **Firebase Console** で `denshi-kessan-web` プロジェクトを開く
+2. 左メニュー「**構築**」→「**Storage**」をクリック
+3. 上部タブの「**ルール**」をクリック
+4. エディタに表示されているデフォルトのルールを**すべて削除**
+5. 以下のルールを**コピー＆ペースト**：
 
 ```javascript
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    match /notices/{userId}/{noticeId}/{filename} {
+    match /notices/{userId}/{companyId}/{filename} {
+      // 誰でも読み取り可能（公開決算公告のため）
       allow read: if true;
+      // 認証済みユーザー本人のみアップロード可能
       allow write: if request.auth != null && request.auth.uid == userId;
+      // 認証済みユーザー本人のみ削除可能
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
   }
 }
 ```
+
+6. 右上の「**公開**」ボタンをクリック（これを忘れずに！）
+7. 確認ダイアログが表示されたら「**公開**」をクリック
+
+#### 確認方法：
+
+- ルールが正しく公開されると、「ルール」タブに「最終更新日時」が表示されます
+- ブラウザで `http://localhost:3000/mypage/upload` を再読み込み
+- PDFファイルをアップロードしてテスト
+
+#### トラブルシューティング：
+
+もし上記のルールでもエラーが出る場合は、**一時的に**以下のテスト用ルールを使用してください：
+
+```javascript
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      // 認証済みユーザーは全ての操作が可能（テスト用）
+      allow read, write: if request.auth != null;
+    }
+  }
+}
+```
+
+⚠️ **注意**: テスト用ルールは開発環境でのみ使用してください。動作確認後、本番用のルール（最初のもの）に戻してください。
 
 ## 5. Web アプリの追加
 
