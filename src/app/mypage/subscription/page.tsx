@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
@@ -17,6 +17,14 @@ interface SubscriptionData {
 }
 
 export default function SubscriptionPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><p className="text-gray-500">読み込み中...</p></div>}>
+      <SubscriptionPageContent />
+    </Suspense>
+  );
+}
+
+function SubscriptionPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const planFromQuery = searchParams.get("plan");
