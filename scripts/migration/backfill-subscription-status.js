@@ -172,7 +172,7 @@ async function backfillFromPayjp() {
               
               let periodYears = 1;
               if (amount >= 30000) periodYears = 10;
-              else if (amount >= 4000) periodYears = 5;
+              else if (amount >= 3900) periodYears = 5;
               
               const expDate = new Date(chargeDate);
               expDate.setFullYear(expDate.getFullYear() + periodYears);
