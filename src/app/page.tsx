@@ -290,12 +290,35 @@ export default function Home() {
                     <p className="text-gray-700">登録後の管理画面です。簡単に操作できます。</p>
                   </div>
                 </div>
-                <div className="bg-gray-100 rounded h-48 flex items-center justify-center text-gray-500 mb-6 border border-gray-300">
-                  <div className="text-center">
-                    <svg className="w-12 h-12 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-                    </svg>
-                    <p className="text-sm">[管理画面イメージ]</p>
+                <div className="bg-gray-50 rounded border border-gray-300 p-4 mb-6 overflow-hidden">
+                  {/* 管理画面モック */}
+                  <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                    <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-200">
+                      <span className="font-bold text-gray-800 text-sm">アップロード済みファイル一覧</span>
+                      <span className="px-3 py-1 bg-green-700 text-white rounded text-xs font-bold">+ 新規アップロード</span>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between bg-gray-50 p-2 rounded border border-gray-200">
+                        <div>
+                          <p className="text-xs font-bold text-gray-800">第25期 決算公告</p>
+                          <p className="text-[10px] text-gray-500">2026/01/15</p>
+                        </div>
+                        <div className="flex gap-1">
+                          <span className="px-2 py-1 border border-blue-700 text-blue-700 text-[10px] font-bold rounded">表示</span>
+                          <span className="px-2 py-1 border border-red-600 text-red-600 text-[10px] font-bold rounded">削除</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between bg-gray-50 p-2 rounded border border-gray-200">
+                        <div>
+                          <p className="text-xs font-bold text-gray-800">第24期 決算公告</p>
+                          <p className="text-[10px] text-gray-500">2025/01/20</p>
+                        </div>
+                        <div className="flex gap-1">
+                          <span className="px-2 py-1 border border-blue-700 text-blue-700 text-[10px] font-bold rounded">表示</span>
+                          <span className="px-2 py-1 border border-red-600 text-red-600 text-[10px] font-bold rounded">削除</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div className="text-center">
@@ -317,12 +340,27 @@ export default function Home() {
                     <p className="text-gray-700">電子決算公告の登録画面です。簡単にアップロードできます。</p>
                   </div>
                 </div>
-                <div className="bg-gray-100 rounded h-48 flex items-center justify-center text-gray-500 mb-6 border border-gray-300">
-                  <div className="text-center">
-                    <svg className="w-12 h-12 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                    <p className="text-sm">[PDFアップロード画面イメージ]</p>
+                <div className="bg-gray-50 rounded border border-gray-300 p-4 mb-6 overflow-hidden">
+                  {/* アップロード画面モック */}
+                  <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                    <div className="mb-3 pb-2 border-b border-gray-200">
+                      <span className="font-bold text-gray-800 text-sm">決算公告のアップロード</span>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs text-gray-600 font-medium block mb-1">タイトル</label>
+                        <div className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded text-xs text-gray-700">第26期 決算公告</div>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600 font-medium block mb-1">PDFファイル</label>
+                        <div className="w-full px-3 py-2 bg-blue-50 border-2 border-dashed border-blue-400 rounded text-xs text-blue-700 text-center">
+                          📄 kessan_26ki.pdf（3.2MB）
+                        </div>
+                      </div>
+                      <div className="pt-1">
+                        <span className="w-full block text-center px-4 py-2 bg-blue-700 text-white rounded text-xs font-bold">アップロード</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div className="text-center">
