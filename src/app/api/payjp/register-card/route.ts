@@ -4,10 +4,13 @@ import { verifyAuthAndUserId } from "@/lib/auth-server";
 import admin from "firebase-admin";
 
 // Pay.jp v1 SDK
-const payjp = require("payjp")(process.env.PAYJP_SECRET_KEY);
+function getPayjp() {
+  return require("payjp")(process.env.PAYJP_SECRET_KEY);
+}
 
 export async function POST(request: Request) {
   try {
+    const payjp = getPayjp();
     const body = await request.json();
     const { userId, token } = body;
 

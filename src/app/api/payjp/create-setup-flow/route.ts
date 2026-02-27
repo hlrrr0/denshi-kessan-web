@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getFirebaseAdmin } from "@/lib/firebase-admin";
 import { verifyAuthAndUserId } from "@/lib/auth-server";
 
-const payjp = require("payjp")(process.env.PAYJP_SECRET_KEY);
+function getPayjp() {
+  return require("payjp")(process.env.PAYJP_SECRET_KEY);
+}
 
 export async function POST(request: NextRequest) {
   try {
+    const payjp = getPayjp();
     const body = await request.json();
     const { userId } = body;
 

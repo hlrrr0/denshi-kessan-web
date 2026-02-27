@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 
 // Pay.jp v1 SDK
-const payjp = require("payjp")(process.env.PAYJP_SECRET_KEY);
+function getPayjp() {
+  return require("payjp")(process.env.PAYJP_SECRET_KEY);
+}
 
 // プラン定義
 const PLANS = [
@@ -21,6 +23,7 @@ const PLANS = [
 
 export async function POST(request: Request) {
   try {
+    const payjp = getPayjp();
     const results = [];
     
     // 全てのプランを確認または作成
