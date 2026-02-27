@@ -57,9 +57,9 @@ export default function SettlementsPage() {
                 id: doc.id, 
                 userId,
                 ...doc.data() 
-              };
+              } as any;
             })
-            .filter(company => {
+            .filter((company: any) => {
               // 課金済みかつ有効期限内のもののみ表示
               if (!company.subscriptionActive) return false;
               const expiresAt = company.subscriptionExpiresAt;
