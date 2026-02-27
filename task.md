@@ -22,8 +22,8 @@
 ## P2 — 推奨
 
 - [x] 13. **OGPメタデータ設定** — OpenGraph / Twitter Card / canonical / metadataBase
-- [ ] 14. セキュリティヘッダー追加（`next.config.ts` にCSP等）
-- [ ] 15. モバイルハンバーガーメニュー
-- [ ] 16. `.backup` ファイル削除（2ファイル残存）
-- [ ] 17. テスト導入
-- [ ] 18. CI/CD構築
+- [x] 14. **セキュリティヘッダー追加** — X-Content-Type-Options / X-Frame-Options / HSTS / Referrer-Policy / Permissions-Policy
+- [x] 15. **モバイルハンバーガーメニュー** — Header / TopHeader 両方にレスポンシブメニュー追加
+- [x] 16. **`.backup` ファイル削除** — 2ファイル削除済み
+- [x] 17. **テスト導入** — Jest + ts-jest。payjpユーティリティ17件 + Webhookハンドラ6件 = 計23テスト
+- [x] 18. **CI/CD構築** — GitHub Actions（tsc + jest + next build）
