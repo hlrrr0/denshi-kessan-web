@@ -8,6 +8,7 @@ import { auth, db } from "@/lib/firebase";
 import AuthGuard from "@/components/AuthGuard";
 import Header from "@/components/Header";
 import { SUBSCRIPTION_PLANS, formatPrice } from "@/lib/payjp";
+import { fetchWithAuth } from "@/lib/fetch-with-auth";
 
 interface SubscriptionData {
   subscriptionPlanId: string;
@@ -49,9 +50,15 @@ export default function CancelSubscriptionPage() {
       
       if (subscriptionSnap.exists()) {
         const subscription = subscriptionSnap.data();
+        
+        // 期限チェック
+        const expirationDate = subscription.expirationDate?.toDate();
+        const isExpired = expirationDate ? new Date() > expirationDate : true;
+        const isActive = subscription.active && !isExpired;
+        
         setSubscriptionData({
           subscriptionPlanId: subscription.subscriptionPlanId || "",
-          active: subscription.active || false,
+          active: isActive, // 期限チェック済み
           expirationDate: subscription.expirationDate,
           automaticRenewalFlag: subscription.automaticRenewalFlag || false,
           payjpId: subscription.payjpId,
@@ -59,7 +66,6 @@ export default function CancelSubscriptionPage() {
         });
       }
     } catch (error) {
-      console.error("Error loading subscription data:", error);
     }
   };
 
@@ -78,9 +84,8 @@ export default function CancelSubscriptionPage() {
     setMessage(null);
 
     try {
-      const response = await fetch("/api/payjp/cancel-subscription", {
+      const response = await fetchWithAuth("/api/payjp/cancel-subscription", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user.uid,
         }),
@@ -100,7 +105,6 @@ export default function CancelSubscriptionPage() {
         router.push("/mypage");
       }, 3000);
     } catch (error: any) {
-      console.error("Cancel error:", error);
       setMessage({ type: "error", text: "キャンセルに失敗しました: " + (error.message || "不明なエラー") });
     } finally {
       setProcessing(false);

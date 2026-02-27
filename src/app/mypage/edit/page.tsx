@@ -83,7 +83,6 @@ export default function EditCompanyPage() {
         });
       }
     } catch (error) {
-      console.error("Error loading company data:", error);
     }
   };
 
@@ -146,7 +145,6 @@ export default function EditCompanyPage() {
         }, 2000);
       }
     } catch (error: any) {
-      console.error("Error saving company data:", error);
       setMessage({ type: "error", text: "保存に失敗しました: " + (error.message || "不明なエラー") });
       setLoading(false);
     }

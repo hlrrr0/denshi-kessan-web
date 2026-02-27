@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getFirebaseAdmin } from "@/lib/firebase-admin";
+import { verifyAuthAndUserId } from "@/lib/auth-server";
 import admin from "firebase-admin";
 
 // Pay.jp v1 SDK
@@ -7,7 +8,8 @@ const payjp = require("payjp")(process.env.PAYJP_SECRET_KEY);
 
 export async function POST(request: Request) {
   try {
-    const { userId, token } = await request.json();
+    const body = await request.json();
+    const { userId, token } = body;
 
     if (!userId || !token) {
       return NextResponse.json(
@@ -16,7 +18,11 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log("Registering card with token for user:", userId);
+    // 認証チェック
+    const authResult = await verifyAuthAndUserId(request, userId);
+    if ("error" in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
 
     // Firebase Adminを取得
     const db = getFirebaseAdmin();
@@ -33,23 +39,38 @@ export async function POST(request: Request) {
 
     if (customerId) {
       // 既存のCustomerにカードを追加（既存カードは削除）
-      console.log("Updating card for existing customer:", customerId);
       
       try {
         const customer = await payjp.customers.retrieve(customerId);
         
         // 既存のカードを削除
         if (customer.default_card) {
-          console.log("Deleting old card:", customer.default_card);
-          await payjp.customers.deleteCard(customerId, customer.default_card);
+          const secretKey = process.env.PAYJP_SECRET_KEY;
+          await fetch(`https://api.pay.jp/v1/customers/${customerId}/cards/${customer.default_card}`, {
+            method: "DELETE",
+            headers: {
+              "Authorization": `Basic ${Buffer.from(secretKey + ":").toString("base64")}`,
+            },
+          });
         }
         
-        // 新しいカードを追加
-        const card = await payjp.customers.createCard(customerId, {
-          card: token,
+        // 新しいカードを追加（REST API）
+        const secretKeyForCreate = process.env.PAYJP_SECRET_KEY;
+        const createRes = await fetch(`https://api.pay.jp/v1/customers/${customerId}/cards`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Basic ${Buffer.from(secretKeyForCreate + ":").toString("base64")}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: `card=${token}`,
         });
-        
-        console.log("New card added:", card.id);
+
+        if (!createRes.ok) {
+          const errBody = await createRes.json();
+          throw new Error(errBody.error?.message || "Failed to create card");
+        }
+
+        const card = await createRes.json();
         
         // Firestoreにカード情報を保存
         await db.collection("users").doc(userId).set(
@@ -71,7 +92,6 @@ export async function POST(request: Request) {
       }
     } else {
       // 新規Customerを作成してカードを登録
-      console.log("Creating new customer with card");
       
       try {
         const customer = await payjp.customers.create({
@@ -79,9 +99,6 @@ export async function POST(request: Request) {
           description: `User ${userId}`,
           metadata: { user_id: userId },
         });
-        
-        console.log("Customer created:", customer.id);
-        console.log("Default card:", customer.default_card);
         
         // Firestoreにカスタマー情報を保存
         await db.collection("users").doc(userId).set(
@@ -105,8 +122,6 @@ export async function POST(request: Request) {
     }
   } catch (error: any) {
     console.error("Card registration error:", error);
-    console.error("Error status:", error.status);
-    console.error("Error body:", JSON.stringify(error.body, null, 2));
     return NextResponse.json(
       { 
         error: "Failed to register card", 

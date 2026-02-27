@@ -7,7 +7,7 @@ import { collection, query, where, getDocs, doc, getDoc } from "firebase/firesto
 import { auth, db } from "@/lib/firebase";
 import AuthGuard from "@/components/AuthGuard";
 import Header from "@/components/Header";
-import { SUBSCRIPTION_PLANS, formatPrice } from "@/lib/payjp";
+import { SUBSCRIPTION_PLANS, getAvailablePlans, formatPrice } from "@/lib/payjp";
 
 interface UserData {
   name: string;
@@ -24,6 +24,7 @@ interface SubscriptionData {
   automaticRenewalFlag: boolean;
   createdAt: any;
   payjpSubscriptionId?: string;
+  actualPrice?: number; // 実際の契約価格（レガシープラン対応）
 }
 
 interface CompanyData {
@@ -56,6 +57,7 @@ export default function MyPage() {
   const [companyData, setCompanyData] = useState<CompanyData | null>(null);
   const [notices, setNotices] = useState<NoticeData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!auth || !db) return;
@@ -76,13 +78,11 @@ export default function MyPage() {
 
     try {
       // ユーザー情報を取得（ドキュメントIDがuidと同じ）
-      console.log("Loading user data for:", currentUser.uid);
       const userDocRef = doc(db, "users", currentUser.uid);
       const userDocSnap = await getDoc(userDocRef);
       
       if (userDocSnap.exists()) {
         const userDoc = userDocSnap.data();
-        console.log("User data loaded:", userDoc);
         setUserData({
           name: userDoc.name || "",
           email: userDoc.email || currentUser.email || "",
@@ -97,20 +97,23 @@ export default function MyPage() {
         
         if (subscriptionSnap.exists()) {
           const subscription = subscriptionSnap.data();
-          console.log("Subscription data loaded:", subscription);
+          
+          // 期限チェック: 有効期限が現在日時より後かどうか
+          const expirationDate = subscription.expirationDate?.toDate();
+          const isExpired = expirationDate ? new Date() > expirationDate : true;
+          const isActive = subscription.active && !isExpired;
+          
           setSubscriptionData({
             subscriptionPlanId: subscription.subscriptionPlanId || "",
-            active: subscription.active || false,
+            active: isActive, // 期限チェック済みのactive状態
             expirationDate: subscription.expirationDate,
             automaticRenewalFlag: subscription.automaticRenewalFlag || false,
             createdAt: subscription.createdAt,
             payjpSubscriptionId: subscription.payjpSubscriptionId || "",
           });
         } else {
-          console.log("No subscription data found");
         }
       } else {
-        console.log("User document not found, using Auth data");
         // Firestoreにデータがない場合、Authの情報を使用
         setUserData({
           name: currentUser.displayName || "",
@@ -120,16 +123,13 @@ export default function MyPage() {
       }
 
       // 会社情報を取得
-      console.log("Loading company data...");
       const companiesRef = collection(db, "companies");
       const companyQuery = query(companiesRef, where("userId", "==", currentUser.uid));
       const companySnapshot = await getDocs(companyQuery);
-      console.log("Company query result:", companySnapshot.size, "documents");
 
       if (!companySnapshot.empty) {
         const companyDoc = companySnapshot.docs[0];
         const data = companyDoc.data();
-        console.log("Company data loaded:", data);
         setCompanyData({
           id: companyDoc.id,
           name: data.name || "",
@@ -146,32 +146,39 @@ export default function MyPage() {
         });
 
         // 決算公告を取得
-        console.log("Loading notices for company:", companyDoc.id);
         const noticesRef = collection(db, "companies", companyDoc.id, "notices");
         const noticesSnapshot = await getDocs(noticesRef);
-        console.log("Notices query result:", noticesSnapshot.size, "documents");
         const noticesData = noticesSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         })) as NoticeData[];
         setNotices(noticesData);
       } else {
-        console.log("No company data found");
       }
     } catch (error: any) {
-      console.error("Error loading user data:", error);
-      console.error("Error code:", error.code);
-      console.error("Error message:", error.message);
+    }
+  };
+
+  const settlementUrl = companyData
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/settlements/${companyData.id}`
+    : "";
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(settlementUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
     }
   };
 
   if (loading) {
     return (
       <AuthGuard>
-        <div className="min-h-screen flex items-center justify-center">
+        <div className="min-h-screen flex items-center justify-center bg-white">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">読み込み中...</p>
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-300 border-t-blue-700 mx-auto mb-4"></div>
+            <p className="text-gray-700 font-bold">読み込み中...</p>
           </div>
         </div>
       </AuthGuard>
@@ -180,50 +187,19 @@ export default function MyPage() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-white">
         <Header />
-        <main className="container mx-auto px-4 py-16">
-          <h1 className="text-3xl font-bold mb-8">マイページ</h1>
+        <main className="container mx-auto px-4 py-8 max-w-5xl">
+          <h1 className="text-2xl font-bold mb-6 text-gray-900 pb-4 border-b-2 border-gray-300">マイページ</h1>
 
-          <div className="space-y-6">
-            {/* 担当者情報 */}
-            <section className="bg-white rounded-lg shadow p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">担当者情報</h2>
-                <button
-                  onClick={() => router.push("/mypage/edit-profile")}
-                  className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                >
-                  編集
-                </button>
-              </div>
-              {userData ? (
-                <div className="space-y-3">
-                  <div className="flex border-b pb-2">
-                    <span className="w-32 text-gray-600">氏名</span>
-                    <span className="font-medium">{userData.name || "未設定"}</span>
-                  </div>
-                  <div className="flex border-b pb-2">
-                    <span className="w-32 text-gray-600">メールアドレス</span>
-                    <span className="font-medium">{userData.email}</span>
-                  </div>
-                  <div className="flex border-b pb-2">
-                    <span className="w-32 text-gray-600">電話番号</span>
-                    <span className="font-medium">{userData.phone || "未設定"}</span>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-gray-500">担当者情報が登録されていません</p>
-              )}
-            </section>
-
+          <div className="space-y-8">
             {/* サブスクリプション・決済情報 */}
-            <section className="bg-white rounded-lg shadow p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">サブスクリプション・決済情報</h2>
+            <section className="bg-gray-50 border-2 border-gray-300 p-6">
+              <div className="flex justify-between items-center mb-6 pb-3 border-b border-gray-300">
+                <h2 className="text-lg font-bold text-gray-900">契約・決済情報</h2>
                 <button
                   onClick={() => router.push("/mypage/subscription")}
-                  className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                  className="px-4 py-2 bg-blue-700 text-white rounded text-sm font-bold hover:bg-blue-800"
                 >
                   プラン変更
                 </button>
@@ -231,101 +207,142 @@ export default function MyPage() {
               {subscriptionData && subscriptionData.active ? (
                 <div className="space-y-4">
                   {/* 現在のプラン */}
-                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm text-gray-600">現在のプラン</span>
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        subscriptionData.active ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
-                      }`}>
-                        {subscriptionData.active ? "有効" : "無効"}
+                  <div className="bg-white border-2 border-blue-700 p-5 mb-4">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-sm font-bold text-gray-700">現在のプラン</span>
+                      <span className="px-3 py-1 bg-green-700 text-white text-xs font-bold">
+                        契約中
                       </span>
                     </div>
                     <div className="flex justify-between items-baseline">
-                      <span className="text-xl font-bold text-blue-900">
+                      <span className="text-lg font-bold text-gray-900">
                         {SUBSCRIPTION_PLANS.find(p => p.id === subscriptionData.subscriptionPlanId)?.name || "不明"}
                       </span>
-                      <span className="text-lg font-semibold text-blue-700">
-                        {formatPrice(SUBSCRIPTION_PLANS.find(p => p.id === subscriptionData.subscriptionPlanId)?.price || 0)}
+                      <span className="text-xl font-bold text-blue-700">
+                        {formatPrice(
+                          subscriptionData.actualPrice || 
+                          SUBSCRIPTION_PLANS.find(p => p.id === subscriptionData.subscriptionPlanId)?.price || 
+                          0
+                        )}
                       </span>
                     </div>
                   </div>
 
-                  {/* 有効期限 */}
-                  <div className="flex border-b pb-2">
-                    <span className="w-40 text-gray-600">有効期限</span>
-                    <span className="font-medium">
-                      {subscriptionData.expirationDate?.toDate?.()?.toLocaleDateString() || "不明"}
-                    </span>
-                  </div>
-
-                  {/* 自動更新 */}
-                  <div className="flex border-b pb-2">
-                    <span className="w-40 text-gray-600">決済タイプ</span>
-                    <div className="flex items-center gap-2">
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        subscriptionData.automaticRenewalFlag 
-                          ? "bg-blue-100 text-blue-700" 
-                          : "bg-green-100 text-green-700"
-                      }`}>
-                        {subscriptionData.automaticRenewalFlag ? "定期課金（自動更新）" : "一括払い"}
-                      </span>
-                      {subscriptionData.automaticRenewalFlag && (
-                        <button
-                          onClick={() => router.push("/mypage/subscription/cancel")}
-                          className="text-red-600 hover:text-red-800 text-xs font-medium"
-                        >
-                          キャンセル
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* 登録済みカード情報 */}
-                  <div className="flex border-b pb-2">
-                    <span className="w-40 text-gray-600">クレジットカード</span>
-                    <div className="flex-1 flex justify-between items-center">
-                      <span className="font-medium">
-                        {userData?.payjpCardId ? "登録済み" : "未登録"}
-                      </span>
-                      <button
-                        onClick={() => router.push("/mypage/payment")}
-                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                      >
-                        {userData?.payjpCardId ? "カード変更" : "カード登録"}
-                      </button>
-                    </div>
-                  </div>
+                  {/* 契約詳細テーブル */}
+                  <table className="w-full border-collapse">
+                    <tbody>
+                      <tr className="border-b border-gray-300">
+                        <td className="py-3 text-gray-700 font-bold w-40">有効期限</td>
+                        <td className="py-3 text-gray-900">
+                          {subscriptionData.expirationDate?.toDate?.()?.toLocaleDateString() || "不明"}
+                        </td>
+                      </tr>
+                      <tr className="border-b border-gray-300">
+                        <td className="py-3 text-gray-700 font-bold">決済タイプ</td>
+                        <td className="py-3">
+                          <div className="flex items-center gap-3">
+                            <span className="text-gray-900 font-medium">
+                              {subscriptionData.automaticRenewalFlag ? "定期課金（自動更新）" : "一括払い"}
+                            </span>
+                            {subscriptionData.automaticRenewalFlag && (
+                              <button
+                                onClick={() => router.push("/mypage/subscription/cancel")}
+                                className="px-3 py-1 border border-red-600 text-red-600 text-xs font-bold hover:bg-red-50"
+                              >
+                                解約手続き
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                      <tr className="border-b border-gray-300">
+                        <td className="py-3 text-gray-700 font-bold">クレジットカード</td>
+                        <td className="py-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-900">
+                              {userData?.payjpCardId ? "登録済み" : "未登録"}
+                            </span>
+                            <button
+                              onClick={() => router.push("/mypage/payment")}
+                              className="px-4 py-1 border-2 border-blue-700 text-blue-700 text-sm font-bold hover:bg-blue-50"
+                            >
+                              {userData?.payjpCardId ? "カード変更" : "カード登録"}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
 
                   {/* 決済履歴リンク */}
-                  <div className="pt-2">
+                  <div className="pt-4 border-t border-gray-300 mt-4">
                     <button
                       onClick={() => router.push("/mypage/billing-history")}
-                      className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                      className="w-full px-4 py-2 border-2 border-blue-700 text-blue-700 rounded font-bold hover:bg-blue-50"
                     >
                       決済履歴を表示 →
                     </button>
                   </div>
                 </div>
-              ) : (
+              ) : subscriptionData ? (
+                // 期限切れの場合
                 <div>
-                  <p className="text-gray-500 mb-4">サブスクリプションプランに登録していません</p>
-                  <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                    <h3 className="font-semibold mb-3">プラン一覧</h3>
-                    <div className="space-y-3">
-                      {SUBSCRIPTION_PLANS.map((plan) => (
-                        <div key={plan.id} className="flex justify-between items-center border-b pb-2">
-                          <div>
-                            <span className="font-medium">{plan.name}</span>
-                            <p className="text-sm text-gray-500">{plan.description}</p>
+                  <div className="bg-red-50 border-2 border-red-600 p-6 mb-6">
+                    <div className="flex items-start gap-3">
+                      <div className="text-red-600 text-2xl font-bold flex-shrink-0">！</div>
+                      <div className="flex-1">
+                        <h3 className="text-base font-bold text-red-900 mb-2">契約が期限切れです</h3>
+                        <p className="text-sm text-gray-800 mb-2">
+                          有効期限: {subscriptionData.expirationDate?.toDate?.()?.toLocaleDateString() || "不明"}
+                        </p>
+                        <p className="text-sm text-gray-800">
+                          決算公告の公開を継続するには、プランに再登録してください。
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-white border border-gray-300 p-6 mb-6">
+                    <h3 className="font-bold text-gray-900 mb-4">プラン一覧</h3>
+                    <div className="space-y-4">
+                      {getAvailablePlans().map((plan) => (
+                        <div key={plan.id} className="border-b border-gray-300 pb-4 last:border-0">
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="font-bold text-gray-900">{plan.name}</span>
+                            <span className="font-bold text-blue-700 text-lg">{formatPrice(plan.price)}</span>
                           </div>
-                          <span className="font-semibold text-blue-600">{formatPrice(plan.price)}</span>
+                          <p className="text-sm text-gray-600">{plan.description}</p>
                         </div>
                       ))}
                     </div>
                   </div>
                   <button
                     onClick={() => router.push("/mypage/subscription")}
-                    className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 w-full"
+                    className="w-full px-6 py-3 bg-blue-700 text-white rounded font-bold hover:bg-blue-800"
+                  >
+                    プランに再登録する
+                  </button>
+                </div>
+              ) : (
+                // 未登録の場合
+                <div>
+                  <p className="text-gray-700 mb-6 text-center">サブスクリプションプランに登録していません</p>
+                  <div className="bg-white border border-gray-300 p-6 mb-6">
+                    <h3 className="font-bold text-gray-900 mb-4">プラン一覧</h3>
+                    <div className="space-y-4">
+                      {getAvailablePlans().map((plan) => (
+                        <div key={plan.id} className="border-b border-gray-300 pb-4 last:border-0">
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="font-bold text-gray-900">{plan.name}</span>
+                            <span className="font-bold text-blue-700 text-lg">{formatPrice(plan.price)}</span>
+                          </div>
+                          <p className="text-sm text-gray-600">{plan.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => router.push("/mypage/subscription")}
+                    className="w-full px-6 py-3 bg-blue-700 text-white rounded font-bold hover:bg-blue-800"
                   >
                     プランに登録する
                   </button>
@@ -333,76 +350,65 @@ export default function MyPage() {
               )}
             </section>
 
-            {/* 登録企業情報 */}
-            <section className="bg-white rounded-lg shadow p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">登録企業情報</h2>
-                <button
-                  onClick={() => router.push("/mypage/edit")}
-                  className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                >
-                  編集
-                </button>
-              </div>
-              {companyData ? (
-                <div className="space-y-3">
-                  <div className="flex border-b pb-2">
-                    <span className="w-40 text-gray-600">会社名</span>
-                    <span className="font-medium">{companyData.name}</span>
-                  </div>
-                  <div className="flex border-b pb-2">
-                    <span className="w-40 text-gray-600">会社名（フリガナ）</span>
-                    <span className="font-medium">{companyData.nameFurigana}</span>
-                  </div>
-                  <div className="flex border-b pb-2">
-                    <span className="w-40 text-gray-600">代表者</span>
-                    <span className="font-medium">{companyData.representativeName}</span>
-                  </div>
-                  <div className="flex border-b pb-2">
-                    <span className="w-40 text-gray-600">設立日</span>
-                    <span className="font-medium">{companyData.establishmentDate}</span>
-                  </div>
-                  <div className="flex border-b pb-2">
-                    <span className="w-40 text-gray-600">資本金</span>
-                    <span className="font-medium">{companyData.capital.toLocaleString()}円</span>
-                  </div>
-                  <div className="flex border-b pb-2">
-                    <span className="w-40 text-gray-600">決算月</span>
-                    <span className="font-medium">{companyData.accountClosingMonth}月</span>
-                  </div>
-                  {companyData.businessDescription && (
-                    <div className="flex border-b pb-2">
-                      <span className="w-40 text-gray-600">事業内容</span>
-                      <span className="font-medium">{companyData.businessDescription}</span>
-                    </div>
-                  )}
-                  {companyData.officeAddress && (
-                    <div className="flex border-b pb-2">
-                      <span className="w-40 text-gray-600">事業所</span>
-                      <span className="font-medium">{companyData.officeAddress}</span>
-                    </div>
-                  )}
+            {/* 登記に掲載のURL */}
+            {companyData && subscriptionData?.active && (
+              <section className="bg-gray-50 border-2 border-blue-700 p-6">
+                <div className="mb-4 pb-3 border-b border-gray-300">
+                  <h2 className="text-lg font-bold text-gray-900 flex items-center">
+                    <svg className="w-5 h-5 text-blue-700 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                    登記に掲載のURLはこちら
+                  </h2>
                 </div>
-              ) : (
-                <div>
-                  <p className="text-gray-500 mb-4">企業情報が登録されていません</p>
+                <p className="text-sm text-gray-700 mb-3">登記簿への掲載URLとしてご利用ください。</p>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="flex-1 bg-white rounded border-2 border-gray-300 px-4 py-3">
+                    <p className="text-sm text-gray-900 break-all font-mono">
+                      {settlementUrl}
+                    </p>
+                  </div>
                   <button
-                    onClick={() => router.push("/mypage/edit")}
-                    className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
+                    onClick={copyToClipboard}
+                    className="flex-shrink-0 px-6 py-3 bg-blue-700 hover:bg-blue-800 text-white font-bold rounded border-2 border-blue-700 transition-colors flex items-center justify-center gap-2"
                   >
-                    企業情報を登録
+                    {copied ? (
+                      <>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        コピーしました
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        URLをコピー
+                      </>
+                    )}
                   </button>
                 </div>
-              )}
-            </section>
+                <div className="mt-3">
+                  <a
+                    href={settlementUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-700 font-bold hover:text-blue-800 underline"
+                  >
+                    公開ページを確認する →
+                  </a>
+                </div>
+              </section>
+            )}
 
             {/* アップロード済みファイル一覧 */}
-            <section className="bg-white rounded-lg shadow p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">アップロード済みファイル一覧</h2>
+            <section className="bg-gray-50 border-2 border-gray-300 p-6">
+              <div className="flex justify-between items-center mb-6 pb-3 border-b border-gray-300">
+                <h2 className="text-lg font-bold text-gray-900">アップロード済みファイル一覧</h2>
                 <button
                   onClick={() => router.push("/mypage/upload")}
-                  className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 text-sm font-medium"
+                  className="px-4 py-2 bg-green-700 text-white rounded text-sm font-bold hover:bg-green-800"
                 >
                   + 新規アップロード
                 </button>
@@ -410,24 +416,24 @@ export default function MyPage() {
               {notices.length > 0 ? (
                 <div className="space-y-3">
                   {notices.map((notice) => (
-                    <div key={notice.id} className="flex items-center justify-between border-b pb-3">
+                    <div key={notice.id} className="bg-white border border-gray-300 p-4 flex items-center justify-between">
                       <div className="flex-1">
-                        <h3 className="font-medium">{notice.title}</h3>
-                        <p className="text-sm text-gray-500">
+                        <h3 className="font-bold text-gray-900">{notice.title}</h3>
+                        <p className="text-sm text-gray-600">
                           {notice.createdAt?.toDate?.()?.toLocaleDateString() || "日付不明"}
                         </p>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-3">
                         <a
                           href={notice.pdfUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                          className="px-4 py-2 border-2 border-blue-700 text-blue-700 text-sm font-bold hover:bg-blue-50"
                         >
                           表示
                         </a>
                         <button
-                          className="text-red-600 hover:text-red-800 text-sm font-medium"
+                          className="px-4 py-2 border-2 border-red-600 text-red-600 text-sm font-bold hover:bg-red-50"
                         >
                           削除
                         </button>
@@ -436,15 +442,113 @@ export default function MyPage() {
                   ))}
                 </div>
               ) : (
-                <div>
-                  <p className="text-gray-500 mb-4">アップロード済みのファイルはありません</p>
+                <div className="text-center py-8">
+                  <p className="text-gray-600 mb-4">アップロード済みのファイルはありません</p>
                   <button
                     onClick={() => router.push("/mypage/upload")}
-                    className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700"
+                    className="px-6 py-3 bg-green-700 text-white rounded font-bold hover:bg-green-800"
                   >
                     決算公告をアップロード
                   </button>
                 </div>
+              )}
+            </section>
+
+            {/* 登録企業情報 */}
+            <section className="bg-gray-50 border-2 border-gray-300 p-6">
+              <div className="flex justify-between items-center mb-6 pb-3 border-b border-gray-300">
+                <h2 className="text-lg font-bold text-gray-900">登録企業情報</h2>
+                <button
+                  onClick={() => router.push("/mypage/edit")}
+                  className="px-4 py-2 bg-blue-700 text-white rounded text-sm font-bold hover:bg-blue-800"
+                >
+                  編集
+                </button>
+              </div>
+              {companyData ? (
+                <table className="w-full border-collapse">
+                  <tbody>
+                    <tr className="border-b border-gray-300">
+                      <td className="py-3 text-gray-700 font-bold w-48">会社名</td>
+                      <td className="py-3 text-gray-900">{companyData.name}</td>
+                    </tr>
+                    <tr className="border-b border-gray-300">
+                      <td className="py-3 text-gray-700 font-bold">会社名（フリガナ）</td>
+                      <td className="py-3 text-gray-900">{companyData.nameFurigana}</td>
+                    </tr>
+                    <tr className="border-b border-gray-300">
+                      <td className="py-3 text-gray-700 font-bold">代表者</td>
+                      <td className="py-3 text-gray-900">{companyData.representativeName}</td>
+                    </tr>
+                    <tr className="border-b border-gray-300">
+                      <td className="py-3 text-gray-700 font-bold">設立日</td>
+                      <td className="py-3 text-gray-900">{companyData.establishmentDate}</td>
+                    </tr>
+                    <tr className="border-b border-gray-300">
+                      <td className="py-3 text-gray-700 font-bold">資本金</td>
+                      <td className="py-3 text-gray-900">{companyData.capital.toLocaleString()}円</td>
+                    </tr>
+                    <tr className="border-b border-gray-300">
+                      <td className="py-3 text-gray-700 font-bold">決算月</td>
+                      <td className="py-3 text-gray-900">{companyData.accountClosingMonth}月</td>
+                    </tr>
+                    {companyData.businessDescription && (
+                      <tr className="border-b border-gray-300">
+                        <td className="py-3 text-gray-700 font-bold">事業内容</td>
+                        <td className="py-3 text-gray-900">{companyData.businessDescription}</td>
+                      </tr>
+                    )}
+                    {companyData.officeAddress && (
+                      <tr className="border-b border-gray-300">
+                        <td className="py-3 text-gray-700 font-bold">事業所</td>
+                        <td className="py-3 text-gray-900">{companyData.officeAddress}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-600 mb-4">企業情報が登録されていません</p>
+                  <button
+                    onClick={() => router.push("/mypage/edit")}
+                    className="px-6 py-3 bg-blue-700 text-white rounded font-bold hover:bg-blue-800"
+                  >
+                    企業情報を登録
+                  </button>
+                </div>
+              )}
+            </section>
+
+            {/* 担当者情報 */}
+            <section className="bg-gray-50 border-2 border-gray-300 p-6">
+              <div className="flex justify-between items-center mb-6 pb-3 border-b border-gray-300">
+                <h2 className="text-lg font-bold text-gray-900">担当者情報</h2>
+                <button
+                  onClick={() => router.push("/mypage/edit-profile")}
+                  className="px-4 py-2 bg-blue-700 text-white rounded text-sm font-bold hover:bg-blue-800"
+                >
+                  編集
+                </button>
+              </div>
+              {userData ? (
+                <table className="w-full border-collapse">
+                  <tbody>
+                    <tr className="border-b border-gray-300">
+                      <td className="py-3 text-gray-700 font-bold w-48">氏名</td>
+                      <td className="py-3 text-gray-900">{userData.name || "未設定"}</td>
+                    </tr>
+                    <tr className="border-b border-gray-300">
+                      <td className="py-3 text-gray-700 font-bold">メールアドレス</td>
+                      <td className="py-3 text-gray-900">{userData.email}</td>
+                    </tr>
+                    <tr className="border-b border-gray-300">
+                      <td className="py-3 text-gray-700 font-bold">電話番号</td>
+                      <td className="py-3 text-gray-900">{userData.phone || "未設定"}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              ) : (
+                <p className="text-gray-600">担当者情報が登録されていません</p>
               )}
             </section>
           </div>

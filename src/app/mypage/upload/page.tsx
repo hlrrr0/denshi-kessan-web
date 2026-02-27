@@ -47,7 +47,6 @@ export default function UploadPage() {
         setMessage({ type: "error", text: "企業情報を先に登録してください" });
       }
     } catch (error) {
-      console.error("Error loading company data:", error);
     }
   };
 
@@ -94,8 +93,6 @@ export default function UploadPage() {
       const timestamp = Date.now();
       const fileName = `${timestamp}_${file.name}`;
       const storagePath = `notices/${user.uid}/${companyId}/${fileName}`;
-      
-      console.log("Uploading to:", storagePath);
 
       // Firebase Storageにアップロード
       const storageRef = ref(storage, storagePath);
@@ -107,11 +104,9 @@ export default function UploadPage() {
           // アップロード進捗
           const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
           setUploadProgress(progress);
-          console.log("Upload progress:", progress);
         },
         (error) => {
           // エラー処理
-          console.error("Upload error:", error);
           setMessage({ type: "error", text: "アップロードに失敗しました: " + error.message });
           setLoading(false);
         },
@@ -119,7 +114,6 @@ export default function UploadPage() {
           // アップロード完了
           try {
             const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-            console.log("File uploaded, URL:", downloadURL);
 
             // Firestoreにメタ情報を保存
             if (!db) {
@@ -138,7 +132,6 @@ export default function UploadPage() {
             };
 
             await setDoc(noticeRef, noticeData);
-            console.log("Notice metadata saved");
 
             setMessage({ type: "success", text: "アップロードが完了しました。マイページに戻ります..." });
             
@@ -147,14 +140,12 @@ export default function UploadPage() {
               router.push("/mypage");
             }, 2000);
           } catch (error: any) {
-            console.error("Error saving metadata:", error);
             setMessage({ type: "error", text: "メタデータの保存に失敗しました: " + error.message });
             setLoading(false);
           }
         }
       );
     } catch (error: any) {
-      console.error("Error uploading file:", error);
       setMessage({ type: "error", text: "アップロードに失敗しました: " + error.message });
       setLoading(false);
     }

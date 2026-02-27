@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getFirebaseAdmin } from "@/lib/firebase-admin";
+import { verifyAuthAndUserId } from "@/lib/auth-server";
 import admin from "firebase-admin";
 
 // Pay.jp v1 SDK
@@ -7,13 +8,20 @@ const payjp = require("payjp")(process.env.PAYJP_SECRET_KEY);
 
 export async function POST(request: Request) {
   try {
-    const { userId } = await request.json();
+    const body = await request.json();
+    const { userId } = body;
 
     if (!userId) {
       return NextResponse.json(
         { error: "UserId is required" },
         { status: 400 }
       );
+    }
+
+    // 認証チェック
+    const authResult = await verifyAuthAndUserId(request, userId);
+    if ("error" in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
 
     // Firebase Adminを取得
@@ -48,12 +56,8 @@ export async function POST(request: Request) {
     const subscriptionId = subscriptionData.payjpId;
     
     try {
-      console.log("Canceling subscription:", subscriptionId);
-      
       // Pay.jp の定期課金をキャンセル
       const deletedSubscription = await payjp.subscriptions.delete(subscriptionId);
-      
-      console.log("Subscription deleted:", deletedSubscription);
 
       // Firestoreのサブスクリプション情報を更新
       // 期限まではアクティブのまま、自動更新フラグだけをfalseにする
@@ -63,14 +67,33 @@ export async function POST(request: Request) {
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
+      // 🆕 ユーザーが所有する全企業のサブスクリプション状態を更新
+      // キャンセルしても期限までは有効なので、subscriptionActiveはtrueのまま
+      const companiesSnapshot = await db.collection("companies")
+        .where("userId", "==", userId)
+        .get();
+      
+      if (!companiesSnapshot.empty) {
+        const batch = db.batch();
+        const expirationDate = subscriptionData.expirationDate;
+        
+        companiesSnapshot.docs.forEach(companyDoc => {
+          batch.update(companyDoc.ref, {
+            subscriptionActive: true, // 期限までは有効
+            subscriptionExpiresAt: expirationDate,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        });
+        
+        await batch.commit();
+      }
+
       return NextResponse.json({
         success: true,
         message: "Subscription canceled successfully. Access continues until expiration date.",
       });
     } catch (error: any) {
       console.error("Subscription cancellation error:", error);
-      console.error("Error status:", error.status);
-      console.error("Error body:", JSON.stringify(error.body, null, 2));
       throw error;
     }
   } catch (error: any) {

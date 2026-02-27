@@ -86,7 +86,6 @@ export default function DashboardPage() {
         });
       }
     } catch (error) {
-      console.error("Error loading company data:", error);
     }
   };
 
@@ -100,8 +99,6 @@ export default function DashboardPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setMessage(null);
-
-    console.log("Form submitted", { userId, companyId, formData });
 
     if (!db || !userId) {
       setMessage({ type: "error", text: "認証エラーが発生しました" });
@@ -134,13 +131,10 @@ export default function DashboardPage() {
         updatedAt: Timestamp.now(),
       };
 
-      console.log("Saving company data:", companyData);
-
       if (companyId) {
         // 更新
         await setDoc(doc(db, "companies", companyId), companyData);
         setMessage({ type: "success", text: "会社情報を更新しました。ダッシュボードを再読み込みします..." });
-        console.log("Company updated successfully");
         
         // 2秒後にページをリロード
         setTimeout(() => {
@@ -155,7 +149,6 @@ export default function DashboardPage() {
         });
         setCompanyId(newCompanyRef.id);
         setMessage({ type: "success", text: "会社情報を登録しました。ダッシュボードを再読み込みします..." });
-        console.log("Company created successfully");
         
         // 2秒後にページをリロード
         setTimeout(() => {
@@ -163,7 +156,6 @@ export default function DashboardPage() {
         }, 2000);
       }
     } catch (error: any) {
-      console.error("Error saving company data:", error);
       setMessage({ type: "error", text: "保存に失敗しました: " + (error.message || "不明なエラー") });
       setLoading(false);
     }

@@ -3,47 +3,68 @@ import { NextResponse } from "next/server";
 // Pay.jp v1 SDK
 const payjp = require("payjp")(process.env.PAYJP_SECRET_KEY);
 
+// プラン定義
+const PLANS = [
+  {
+    id: "yearly_plan_980",
+    amount: 980,
+    name: "1年プラン（旧価格）",
+    description: "既存契約者向けの旧価格プラン"
+  },
+  {
+    id: "yearly_plan_3960",
+    amount: 3960,
+    name: "1年プラン",
+    description: "新規契約者向けの現行価格プラン"
+  }
+];
+
 export async function POST(request: Request) {
   try {
-    // 既存のプランを確認
-    let plan;
-    try {
-      plan = await payjp.plans.retrieve("yearly_plan_980");
-      console.log("Plan already exists:", plan.id);
-      return NextResponse.json({
-        success: true,
-        plan: plan,
-        message: "Plan already exists",
-      });
-    } catch (error: any) {
-      // プランが存在しない場合は作成
-      if (error.status === 404) {
-        console.log("Creating new plan...");
-        
-        plan = await payjp.plans.create({
-          id: "yearly_plan_980",
-          amount: 980,
-          currency: "jpy",
-          interval: "year", // 年次課金
-          name: "1年プラン",
+    const results = [];
+    
+    // 全てのプランを確認または作成
+    for (const planDef of PLANS) {
+      try {
+        // 既存のプランを確認
+        const plan = await payjp.plans.retrieve(planDef.id);
+        results.push({
+          planId: plan.id,
+          status: "exists",
+          amount: plan.amount
         });
-        
-        console.log("Plan created:", plan.id);
-        
-        return NextResponse.json({
-          success: true,
-          plan: plan,
-          message: "Plan created successfully",
-        });
-      } else {
-        throw error;
+      } catch (error: any) {
+        // プランが存在しない場合は作成
+        if (error.status === 404) {
+          const plan = await payjp.plans.create({
+            id: planDef.id,
+            amount: planDef.amount,
+            currency: "jpy",
+            interval: "year",
+            name: planDef.name,
+          });
+          
+          results.push({
+            planId: plan.id,
+            status: "created",
+            amount: plan.amount
+          });
+        } else {
+          throw error;
+        }
       }
     }
+    
+    return NextResponse.json({
+      success: true,
+      plans: results,
+      message: "Plans setup completed"
+    });
   } catch (error: any) {
-    console.error("Plan creation error:", error);
+    console.error("Plan setup error:", error);
     return NextResponse.json(
       { 
-        error: "Failed to create plan", 
+        error: "Failed to setup plans", 
         details: error.message,
         body: error.body 
       },

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { SUBSCRIPTION_PLANS } from "@/lib/payjp";
 import { getFirebaseAdmin } from "@/lib/firebase-admin";
+import { verifyAuthAndUserId } from "@/lib/auth-server";
 import admin from "firebase-admin";
 
 // Pay.jp v1 SDK を使用（定期課金対応）
@@ -8,13 +9,20 @@ const payjp = require("payjp")(process.env.PAYJP_SECRET_KEY);
 
 export async function POST(request: Request) {
   try {
-    const { planId, userId } = await request.json();
+    const body = await request.json();
+    const { planId, userId } = body;
 
     if (!planId || !userId) {
       return NextResponse.json(
         { error: "PlanId and userId are required" },
         { status: 400 }
       );
+    }
+
+    // 認証チェック
+    const authResult = await verifyAuthAndUserId(request, userId);
+    if ("error" in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
 
     // プラン情報を取得
@@ -53,13 +61,30 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log("Using customer:", customerId);
-    console.log("Card ID:", cardId);
+    // 既存のサブスクリプション情報を取得（プラン変更時の期限延長用）
+    const existingSubDoc = await db.collection("users").doc(userId).collection("subscription").doc("current").get();
+    const existingSub = existingSubDoc.exists ? existingSubDoc.data() : null;
+    let currentExpirationDate: Date | null = null;
+    
+    if (existingSub && existingSub.active) {
+      const expDate = existingSub.expirationDate?.toDate();
+      if (expDate && expDate > new Date()) {
+        currentExpirationDate = expDate;
+      }
+
+      // 既存が定期課金(subscription)の場合、Pay.jpの定期課金を停止
+      if (existingSub.payjpType === "subscription" && existingSub.payjpId) {
+        try {
+          await payjp.subscriptions.cancel(existingSub.payjpId);
+        } catch (cancelError: any) {
+          // 既にキャンセル済みなどのエラーは無視
+        }
+      }
+    }
 
     // Customerのカード情報を確認
     try {
       const customer = await payjp.customers.retrieve(customerId);
-      console.log("Customer default_card:", customer.default_card);
       
       if (!customer.default_card) {
         throw new Error("Customer has no default card");
@@ -77,57 +102,56 @@ export async function POST(request: Request) {
     let automaticRenewal: boolean;
     let expirationDate: Date;
 
-    if (planId === "1year") {
+    if (planId === "1year" || planId === "1year_legacy") {
       // 1年プラン: 定期課金（真の自動更新）
+      const payjpPlanId = plan.payjpPlanId;
+      if (!payjpPlanId) {
+        return NextResponse.json({ error: "Plan configuration error" }, { status: 500 });
+      }
       try {
-        console.log("Creating subscription with plan: yearly_plan_980");
-        
         const subscription = await payjp.subscriptions.create({
           customer: customerId,
-          plan: "yearly_plan_980",
+          plan: payjpPlanId,
         });
 
         payjpId = subscription.id;
         automaticRenewal = true;
         
-        // 次回課金日を取得
-        expirationDate = new Date(subscription.current_period_end * 1000);
+        // 既存の有効期限がある場合はそこに+12ヶ月、なければPay.jpの次回課金日を使用
+        if (currentExpirationDate) {
+          expirationDate = new Date(currentExpirationDate);
+          expirationDate.setMonth(expirationDate.getMonth() + plan.periodMonths);
+        } else {
+          expirationDate = new Date(subscription.current_period_end * 1000);
+        }
         
-        console.log("Subscription created:", payjpId);
-        console.log("Next billing date:", expirationDate);
-        console.log("Subscription status:", subscription.status);
       } catch (subscriptionError: any) {
         console.error("Subscription creation error:", subscriptionError);
-        console.error("Error status:", subscriptionError.status);
-        console.error("Error body:", JSON.stringify(subscriptionError.body, null, 2));
         throw subscriptionError;
       }
     } else {
-      // 5年プラン: 単発決済（一括払い）
+      // 5年・10年プラン: 単発決済（一括払い）
       try {
-        console.log(`Creating one-time charge for ${plan.name}`);
-        
         const charge = await payjp.charges.create({
           amount: plan.price,
           currency: "jpy",
           customer: customerId,
-          description: `${plan.name} - 5 years prepaid for user ${userId}`,
+          description: `${plan.name} - ${plan.periodMonths / 12} years prepaid for user ${userId}`,
         });
 
         payjpId = charge.id;
         automaticRenewal = false;
         
-        // 有効期限を計算（60ヶ月後）
-        expirationDate = new Date();
+        // 既存の有効期限がある場合はそこに加算、なければ現在日時から計算
+        if (currentExpirationDate) {
+          expirationDate = new Date(currentExpirationDate);
+        } else {
+          expirationDate = new Date();
+        }
         expirationDate.setMonth(expirationDate.getMonth() + plan.periodMonths);
         
-        console.log("Charge created:", payjpId);
-        console.log("Charge paid:", charge.paid);
-        console.log("Expiration date:", expirationDate);
       } catch (chargeError: any) {
         console.error("Charge creation error:", chargeError);
-        console.error("Error status:", chargeError.status);
-        console.error("Error body:", JSON.stringify(chargeError.body, null, 2));
         throw chargeError;
       }
     }
@@ -136,7 +160,7 @@ export async function POST(request: Request) {
     await db.collection("users").doc(userId).collection("subscription").doc("current").set({
       subscriptionPlanId: planId,
       payjpId: payjpId, // Subscription IDまたはCharge ID
-      payjpType: planId === "1year" ? "subscription" : "charge", // 種別を保存
+      payjpType: (planId === "1year" || planId === "1year_legacy") ? "subscription" : "charge", // 種別を保存
       active: true,
       expirationDate: admin.firestore.Timestamp.fromDate(expirationDate),
       automaticRenewalFlag: automaticRenewal,
@@ -144,10 +168,28 @@ export async function POST(request: Request) {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
+    // 🆕 ユーザーが所有する全企業のサブスクリプション状態を更新
+    const companiesSnapshot = await db.collection("companies")
+      .where("userId", "==", userId)
+      .get();
+    
+    const batch = db.batch();
+    companiesSnapshot.docs.forEach(companyDoc => {
+      batch.update(companyDoc.ref, {
+        subscriptionActive: true,
+        subscriptionExpiresAt: admin.firestore.Timestamp.fromDate(expirationDate),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+    
+    if (!companiesSnapshot.empty) {
+      await batch.commit();
+    }
+
     return NextResponse.json({
       success: true,
       payjpId: payjpId,
-      payjpType: planId === "1year" ? "subscription" : "charge",
+      payjpType: (planId === "1year" || planId === "1year_legacy") ? "subscription" : "charge",
       expirationDate: expirationDate.toISOString(),
       automaticRenewal: automaticRenewal,
     });

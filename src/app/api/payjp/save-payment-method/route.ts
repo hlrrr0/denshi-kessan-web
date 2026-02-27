@@ -1,16 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import admin from "firebase-admin";
 import { getFirebaseAdmin } from "@/lib/firebase-admin";
+import { verifyAuthAndUserId } from "@/lib/auth-server";
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, paymentMethodId } = await request.json();
+    const body = await request.json();
+    const { userId, paymentMethodId } = body;
 
     if (!userId || !paymentMethodId) {
       return NextResponse.json(
         { error: "userId and paymentMethodId are required" },
         { status: 400 }
       );
+    }
+
+    // 認証チェック
+    const authResult = await verifyAuthAndUserId(request, userId);
+    if ("error" in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
 
     // Firebase Admin を初期化
@@ -30,8 +38,6 @@ export async function POST(request: NextRequest) {
       },
       { merge: true }
     );
-
-    console.log(`Saved payment method ${paymentMethodId} for user ${userId}`);
 
     return NextResponse.json({
       success: true,

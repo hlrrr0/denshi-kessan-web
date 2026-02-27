@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import AuthGuard from "@/components/AuthGuard";
 import Header from "@/components/Header";
 import { getPayjpPublicKey } from "@/lib/payjp";
+import { fetchWithAuth } from "@/lib/fetch-with-auth";
 
 declare global {
   interface Window {
@@ -17,6 +18,9 @@ declare global {
 
 export default function PaymentPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect");
+  const planFromQuery = searchParams.get("plan");
   const [user, setUser] = useState<User | null>(null);
   const [hasCard, setHasCard] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -48,7 +52,6 @@ export default function PaymentPage() {
 
     // すでに読み込まれているかチェック
     if (window.Payjp) {
-      console.log("Payjp already loaded");
       setPayjpLoaded(true);
       return;
     }
@@ -57,11 +60,9 @@ export default function PaymentPage() {
     script.src = "https://js.pay.jp/v2/pay.js";
     script.async = true;
     script.onload = () => {
-      console.log("Payjp script loaded successfully");
       setPayjpLoaded(true);
     };
     script.onerror = () => {
-      console.error("Failed to load Payjp script");
       setMessage({ type: "error", text: "決済システムの読み込みに失敗しました" });
     };
 
@@ -80,7 +81,6 @@ export default function PaymentPage() {
       const mountCardElement = () => {
         const cardElementDiv = document.getElementById('card-element');
         if (!cardElementDiv) {
-          console.error('Card element div not found, retrying...');
           setTimeout(mountCardElement, 100);
           return;
         }
@@ -108,9 +108,7 @@ export default function PaymentPage() {
           card.mount('#card-element');
           setCardElement(card);
           setShouldMountCard(false);
-          console.log("Card element mounted successfully");
         } catch (error) {
-          console.error("Error mounting card element:", error);
           setMessage({ type: "error", text: "カードフォームの表示に失敗しました" });
         }
       };
@@ -128,11 +126,10 @@ export default function PaymentPage() {
       
       if (userDoc.exists()) {
         const data = userDoc.data();
-        // v1ではpayjpCardIdまたはpayjpCustomerIdがあればカード登録済みとみなす
-        setHasCard(!!(data.payjpCustomerId || data.payjpCardId));
+        // payjpCardIdがある場合のみカード登録済みとみなす
+        setHasCard(!!data.payjpCardId);
       }
     } catch (error) {
-      console.error("Error loading card data:", error);
     }
   };
 
@@ -154,10 +151,7 @@ export default function PaymentPage() {
       setPayjpInstance(payjp);
       setShowCardForm(true);
       setShouldMountCard(true);
-
-      console.log("Payjp instance initialized, preparing card form...");
     } catch (error) {
-      console.error("Error initializing Payjp:", error);
       setMessage({ type: "error", text: "カードフォームの初期化に失敗しました" });
     }
   };
@@ -172,23 +166,22 @@ export default function PaymentPage() {
     setMessage(null);
 
     try {
-      console.log("Creating token...");
-
       // トークンを作成
       const result = await payjpInstance.createToken(cardElement);
 
       if (result.error) {
-        console.error("Token creation error:", result.error);
-        throw new Error(result.error.message || "トークンの作成に失敗しました");
+        const errorMsg = result.error.message || result.error.code || "カード情報が正しくありません。カード番号・有効期限・CVC を確認してください。";
+        throw new Error(errorMsg);
       }
 
       const token = result.id;
-      console.log("Token created:", token);
+      if (!token) {
+        throw new Error("トークンの取得に失敗しました。カード情報を確認してください。");
+      }
 
       // トークンをサーバーに送信してCustomerに登録
-      const response = await fetch("/api/payjp/register-card", {
+      const response = await fetchWithAuth("/api/payjp/register-card", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user.uid,
           token: token,
@@ -201,9 +194,7 @@ export default function PaymentPage() {
       }
 
       const data = await response.json();
-      console.log("Card registered:", data);
 
-      setMessage({ type: "success", text: "カードを登録しました！" });
       setShowCardForm(false);
       setShouldMountCard(false);
       setHasCard(true);
@@ -213,8 +204,17 @@ export default function PaymentPage() {
         cardElement.unmount();
         setCardElement(null);
       }
+
+      // サブスクリプション登録から遷移してきた場合、自動で戻す
+      if (redirectTo === "subscription" && planFromQuery) {
+        setMessage({ type: "success", text: "カードを登録しました！サブスクリプション登録に戻ります..." });
+        setTimeout(() => {
+          router.push(`/mypage/subscription?plan=${planFromQuery}`);
+        }, 800);
+      } else {
+        setMessage({ type: "success", text: "カードを登録しました！" });
+      }
     } catch (error: any) {
-      console.error("Card registration error:", error);
       setMessage({ type: "error", text: error.message || "カードの登録に失敗しました" });
     } finally {
       setProcessing(false);
@@ -229,9 +229,8 @@ export default function PaymentPage() {
     setMessage(null);
 
     try {
-      const response = await fetch("/api/payjp/delete-card", {
+      const response = await fetchWithAuth("/api/payjp/delete-card", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: user.uid }),
       });
 
@@ -243,7 +242,6 @@ export default function PaymentPage() {
       setMessage({ type: "success", text: "カードを削除しました" });
       setHasCard(false);
     } catch (error: any) {
-      console.error("Card deletion error:", error);
       setMessage({ type: "error", text: error.message || "カードの削除に失敗しました" });
     } finally {
       setProcessing(false);
@@ -266,6 +264,19 @@ export default function PaymentPage() {
   return (
     <AuthGuard>
       <div className="min-h-screen bg-gray-50">
+        {/* フルスクリーンローディングオーバーレイ */}
+        {processing && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+            <div className="bg-white rounded-lg p-8 flex flex-col items-center gap-4 shadow-xl">
+              <svg className="animate-spin h-10 w-10 text-blue-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <p className="text-gray-900 font-bold text-lg">カード情報を処理中...</p>
+              <p className="text-gray-500 text-sm">しばらくお待ちください</p>
+            </div>
+          </div>
+        )}
         <Header />
         <main className="container mx-auto px-4 py-16">
           <div className="max-w-2xl mx-auto">
@@ -343,7 +354,15 @@ export default function PaymentPage() {
                     disabled={processing}
                     className="flex-1 bg-blue-600 text-white py-3 rounded hover:bg-blue-700 disabled:bg-gray-400 font-semibold"
                   >
-                    {processing ? "処理中..." : "カードを登録"}
+                    {processing ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        登録中...
+                      </span>
+                    ) : "カードを登録"}
                   </button>
                   <button
                     onClick={() => {

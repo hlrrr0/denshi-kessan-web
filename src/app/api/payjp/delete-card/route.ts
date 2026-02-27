@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getFirebaseAdmin } from "@/lib/firebase-admin";
+import { verifyAuthAndUserId } from "@/lib/auth-server";
 import admin from "firebase-admin";
 
 // Pay.jp v1 SDK
@@ -7,13 +8,20 @@ const payjp = require("payjp")(process.env.PAYJP_SECRET_KEY);
 
 export async function POST(request: Request) {
   try {
-    const { userId } = await request.json();
+    const body = await request.json();
+    const { userId } = body;
 
     if (!userId) {
       return NextResponse.json(
         { error: "userId is required" },
         { status: 400 }
       );
+    }
+
+    // 認証チェック
+    const authResult = await verifyAuthAndUserId(request, userId);
+    if ("error" in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
 
     // Firebase Adminを取得
@@ -37,22 +45,49 @@ export async function POST(request: Request) {
 
     const data = userDoc.data();
     const customerId = data?.payjpCustomerId;
-    const cardId = data?.payjpCardId;
+    let cardId = data?.payjpCardId;
 
-    if (!customerId || !cardId) {
+    if (!customerId) {
       return NextResponse.json(
         { error: "No card to delete" },
         { status: 400 }
       );
     }
 
-    console.log("Deleting card:", cardId, "from customer:", customerId);
+    // cardIdがFirestoreにない場合、Pay.jpから取得
+    if (!cardId) {
+      try {
+        const customer = await payjp.customers.retrieve(customerId);
+        cardId = customer.default_card;
+        if (!cardId) {
+          return NextResponse.json(
+            { error: "No card to delete" },
+            { status: 400 }
+          );
+        }
+      } catch (e: any) {
+        console.error("Error retrieving customer:", e);
+        return NextResponse.json(
+          { error: "No card to delete" },
+          { status: 400 }
+        );
+      }
+    }
 
     try {
-      // Pay.jpでカードを削除
-      await payjp.customers.deleteCard(customerId, cardId);
-      
-      console.log("Card deleted successfully");
+      // Pay.jp REST APIで直接カードを削除
+      const secretKey = process.env.PAYJP_SECRET_KEY;
+      const res = await fetch(`https://api.pay.jp/v1/customers/${customerId}/cards/${cardId}`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Basic ${Buffer.from(secretKey + ":").toString("base64")}`,
+        },
+      });
+
+      if (!res.ok) {
+        const errBody = await res.json();
+        throw new Error(errBody.error?.message || "Failed to delete card");
+      }
 
       // Firestoreからカード情報を削除
       await db.collection("users").doc(userId).set(

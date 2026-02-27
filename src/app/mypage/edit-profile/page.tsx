@@ -51,7 +51,6 @@ export default function EditProfilePage() {
         });
       }
     } catch (error) {
-      console.error("Error loading profile data:", error);
     }
   };
 
@@ -110,7 +109,6 @@ export default function EditProfilePage() {
         router.push("/mypage");
       }, 2000);
     } catch (error: any) {
-      console.error("Error saving profile:", error);
       setMessage({ type: "error", text: "保存に失敗しました: " + (error.message || "不明なエラー") });
       setLoading(false);
     }

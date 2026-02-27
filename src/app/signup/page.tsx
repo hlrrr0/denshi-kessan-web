@@ -3,9 +3,11 @@
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { signUp } from "@/lib/auth";
+import { useGoogleReCaptcha } from "react-google-recaptcha-v3";
 
 export default function SignupPage() {
   const router = useRouter();
+  const { executeRecaptcha } = useGoogleReCaptcha();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -39,6 +41,33 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
+      // reCAPTCHA検証
+      if (!executeRecaptcha) {
+        setError("reCAPTCHAの読み込みに失敗しました。ページを再読み込みしてください。");
+        setLoading(false);
+        return;
+      }
+
+      const recaptchaToken = await executeRecaptcha("signup");
+
+      // reCAPTCHAトークンを検証
+      const verifyResponse = await fetch("/api/verify-recaptcha", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ token: recaptchaToken }),
+      });
+
+      const verifyData = await verifyResponse.json();
+
+      if (!verifyData.success) {
+        setError("認証に失敗しました。もう一度お試しください。");
+        setLoading(false);
+        return;
+      }
+
+      // ユーザー登録処理
       const result = await signUp(
         formData.email,
         formData.password,

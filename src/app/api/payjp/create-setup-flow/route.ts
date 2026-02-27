@@ -1,17 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getFirebaseAdmin } from "@/lib/firebase-admin";
+import { verifyAuthAndUserId } from "@/lib/auth-server";
 
 const payjp = require("payjp")(process.env.PAYJP_SECRET_KEY);
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await request.json();
+    const body = await request.json();
+    const { userId } = body;
 
     if (!userId) {
       return NextResponse.json(
         { error: "User ID is required" },
         { status: 400 }
       );
+    }
+
+    // 認証チェック
+    const authResult = await verifyAuthAndUserId(request, userId);
+    if ("error" in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
 
     const secretKey = process.env.PAYJP_SECRET_KEY;
@@ -33,13 +41,11 @@ export async function POST(request: NextRequest) {
     let customerId = userDoc.data()?.payjpCustomerId;
 
     if (!customerId) {
-      console.log("Creating new customer for setup flow...");
       const customer = await payjp.customers.create({
         description: `User ${userId}`,
         metadata: { user_id: userId },
       });
       customerId = customer.id;
-      console.log("Customer created:", customerId);
 
       // Firestoreに保存
       await db.collection("users").doc(userId).set(
@@ -47,7 +53,6 @@ export async function POST(request: NextRequest) {
         { merge: true }
       );
     } else {
-      console.log("Using existing customer for setup flow:", customerId);
     }
 
     // Setup FlowをPay.jp REST APIで直接作成（customer_id を指定）
@@ -69,7 +74,6 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error("Pay.jp API error:", errorData);
       throw new Error(errorData.error?.message || `API Error: ${response.status}`);
     }
 

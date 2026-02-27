@@ -6,7 +6,6 @@ export async function POST(request: Request) {
     const body = await request.json();
     
     // ここでwebhookイベントを処理
-    console.log("PAY.JP webhook received:", body);
     
     return NextResponse.json({ received: true });
   } catch (error) {

@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { auth } from "@/lib/firebase";
 import { signOut } from "@/lib/auth";
 import { onAuthStateChanged, User } from "firebase/auth";
 
 export default function Header() {
   const router = useRouter();
+  const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -43,13 +44,17 @@ export default function Header() {
             <a href="/settlements" className="text-gray-600 hover:text-gray-800">
               公告一覧
             </a>
+            <a href="http://media.denshi-kessan-koukoku.com/" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-gray-800">
+              コラム
+            </a>
             
             {user ? (
               <>
-                <a href="/mypage" className="text-gray-600 hover:text-gray-800">
-                  マイページ
-                </a>
-                <span className="text-sm text-gray-600">{user.email}</span>
+                {!pathname?.startsWith("/mypage") && (
+                  <a href="/mypage" className="text-gray-600 hover:text-gray-800">
+                    マイページ
+                  </a>
+                )}
                 <button
                   onClick={handleSignOut}
                   disabled={loading}

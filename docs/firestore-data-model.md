@@ -42,13 +42,34 @@ firestore/
   subscriptionPlanId: string;    // 1year / 5year
   payjpChargeId: string;
   payjpSubscriptionId: string;
-  active: boolean;
-  expirationDate: Timestamp;
+  active: boolean;               // Firestoreに保存される値（登録時: true）
+  expirationDate: Timestamp;     // 有効期限
   automaticRenewalFlag: boolean;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
 ```
+
+**重要: `active` フィールドの扱い**
+
+- **Firestoreに保存される値**: 登録時に `true`、明示的に削除しない限り `true` のまま
+- **アプリケーションでの判定**: 
+  ```typescript
+  const expirationDate = subscription.expirationDate?.toDate();
+  const isExpired = expirationDate ? new Date() > expirationDate : true;
+  const isActive = subscription.active && !isExpired;
+  ```
+- **期限切れ判定**: `expirationDate` が現在日時より過去の場合、`isActive = false` として扱う
+- **表示制御**:
+  - マイページ: 期限切れの場合は警告メッセージと再登録ボタンを表示
+  - 決算公告一覧: 有効なサブスクリプション(`isActive = true`)を持つユーザーの企業のみ表示
+
+**自動更新失敗時の動作**:
+- 1年プラン（定期課金）でカード期限切れなどにより決済失敗した場合
+  - Pay.jpが自動的に `expirationDate` を更新しない
+  - `expirationDate` が過去になる → `isActive = false` として扱われる
+  - ユーザーは期限切れ警告を見てカード情報を更新し、再登録が必要
+  - 決算公告は自動的に非公開になる（一覧に表示されなくなる）
 
 ## 2. companies コレクション
 
@@ -68,10 +89,32 @@ firestore/
   officeAddress: string;
   officialHomepageUrl: string;
   accountClosingMonth: number;   // 1-12
+  
+  // 🆕 非正規化フィールド（パフォーマンス最適化）
+  subscriptionActive: boolean;   // サブスクリプションの有効状態
+  subscriptionExpiresAt: Timestamp; // サブスクリプション有効期限
+  
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
 ```
+
+**非正規化フィールドについて**:
+
+- **目的**: 決算公告一覧ページでのパフォーマンス最適化（N+1問題の解決）
+- **更新タイミング**:
+  - サブスクリプション登録時: `subscriptionActive: true`, `subscriptionExpiresAt: 期限` に更新
+  - サブスクリプションキャンセル時: 期限までは `subscriptionActive: true` のまま維持
+  - 期限切れ: クライアント側で `subscriptionExpiresAt < 現在時刻` でチェック
+- **クエリ例**:
+  ```typescript
+  query(
+    collection(db, "companies"),
+    where("subscriptionActive", "==", true),
+    where("subscriptionExpiresAt", ">", Timestamp.now())
+  )
+  ```
+- **データ整合性**: ユーザーのサブスクリプション状態が真の情報源、companiesは読み取り最適化用のキャッシュ
 
 ### companies/{companyId}/notices/{noticeId}
 

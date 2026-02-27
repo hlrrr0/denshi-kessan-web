@@ -3,11 +3,11 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 import AuthGuard from "@/components/AuthGuard";
 import Header from "@/components/Header";
 import { formatPrice } from "@/lib/payjp";
+import { fetchWithAuth } from "@/lib/fetch-with-auth";
 
 interface BillingHistoryItem {
   id: string;
@@ -25,7 +25,7 @@ export default function BillingHistoryPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!auth || !db) return;
+    if (!auth) return;
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
@@ -39,37 +39,30 @@ export default function BillingHistoryPage() {
   }, []);
 
   const loadBillingHistory = async (currentUser: User) => {
-    if (!db) return;
-
     try {
-      // TODO: Firestoreから実際の決済履歴を取得
-      // const billingRef = collection(db, "users", currentUser.uid, "billing_history");
-      // const q = query(billingRef, orderBy("date", "desc"));
-      // const snapshot = await getDocs(q);
+      const response = await fetchWithAuth("/api/payjp/billing-history", {
+        method: "POST",
+        body: JSON.stringify({ userId: currentUser.uid }),
+      });
+
+      if (!response.ok) {
+        throw new Error("決済履歴の取得に失敗しました");
+      }
+
+      const data = await response.json();
       
-      // 仮のデータ
-      const mockData: BillingHistoryItem[] = [
-        {
-          id: "1",
-          amount: 980,
-          planName: "1年プラン",
-          status: "成功",
-          date: new Date("2026-02-23"),
-          chargeId: "ch_test_1234567890",
-        },
-        {
-          id: "2",
-          amount: 980,
-          planName: "1年プラン",
-          status: "成功",
-          date: new Date("2025-02-23"),
-          chargeId: "ch_test_0987654321",
-        },
-      ];
+      // APIから取得したデータを変換
+      const history = data.history.map((item: any) => ({
+        id: item.id,
+        amount: item.amount,
+        planName: item.planName,
+        status: item.status,
+        date: new Date(item.date),
+        chargeId: item.chargeId,
+      }));
       
-      setBillingHistory(mockData);
+      setBillingHistory(history);
     } catch (error) {
-      console.error("Error loading billing history:", error);
     }
   };
 
@@ -188,7 +181,6 @@ export default function BillingHistoryPage() {
               <h3 className="font-semibold mb-2">ご注意</h3>
               <ul className="text-sm text-gray-600 space-y-1">
                 <li>• 決済履歴は過去2年分まで表示されます</li>
-                <li>• 領収書が必要な場合は、取引IDをお控えの上お問い合わせください</li>
                 <li>• 決済に関するお問い合わせは support@denshi-kessan-koukoku.com までご連絡ください</li>
               </ul>
             </div>
