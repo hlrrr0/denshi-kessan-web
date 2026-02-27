@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { collection, getDocs, query, where, Timestamp } from "firebase/firestore";
+import { collectionGroup, getDocs, query, where, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Header from "@/components/Header";
 
@@ -19,21 +19,59 @@ export default function SettlementsPage() {
       }
       
       try {
-        // サブスクリプションが有効な企業のみ取得
+        // まずサブスクリプションが有効な企業を取得（collectionGroupで全ユーザーのcompany_informationを検索）
         const now = Timestamp.now();
-        const q = query(
-          collection(db, "companies"),
-          where("subscriptionActive", "==", true),
-          where("subscriptionExpiresAt", ">", now)
-        );
-        const snap = await getDocs(q);
-        const allCompanies = snap.docs.map(doc => ({ 
-          id: doc.id, 
-          ...doc.data() 
-        }));
-        
-        setCompanies(allCompanies);
+        try {
+          const q = query(
+            collectionGroup(db, "company_information"),
+            where("subscriptionActive", "==", true),
+            where("subscriptionExpiresAt", ">", now)
+          );
+          const snap = await getDocs(q);
+          const activeCompanies = snap.docs.map(doc => {
+            // パスからuserIdを取得: users/{userId}/company_information/{docId}
+            const userId = doc.ref.parent.parent?.id || "";
+            return { 
+              id: doc.id, 
+              userId,
+              ...doc.data() 
+            };
+          });
+          
+          if (activeCompanies.length > 0) {
+            setCompanies(activeCompanies);
+            setLoading(false);
+            return;
+          }
+        } catch (indexError) {
+          // collectionGroupインデックスが未作成の場合のフォールバック
+          // 全企業を取得し、クライアント側でサブスクリプション有効のもののみフィルタリング
+          console.warn("collectionGroup query failed (index may be missing), falling back to client-side filter:", indexError);
+          
+          const allSnap = await getDocs(collectionGroup(db, "company_information"));
+          const now = new Date();
+          const activeCompanies = allSnap.docs
+            .map(doc => {
+              const userId = doc.ref.parent.parent?.id || "";
+              return { 
+                id: doc.id, 
+                userId,
+                ...doc.data() 
+              };
+            })
+            .filter(company => {
+              // 課金済みかつ有効期限内のもののみ表示
+              if (!company.subscriptionActive) return false;
+              const expiresAt = company.subscriptionExpiresAt;
+              if (!expiresAt) return false;
+              const expirationDate = expiresAt.toDate ? expiresAt.toDate() : new Date(expiresAt);
+              return expirationDate > now;
+            });
+          
+          setCompanies(activeCompanies);
+        }
       } catch (error) {
+        console.error("Failed to fetch companies:", error);
       } finally {
         setLoading(false);
       }
@@ -93,7 +131,7 @@ export default function SettlementsPage() {
                 <div
                   key={company.id}
                   className="group bg-white rounded border-2 border-gray-300 hover:border-blue-700 transition-all overflow-hidden cursor-pointer"
-                  onClick={() => router.push(`/settlements/${company.id}`)}
+                  onClick={() => router.push(`/settlements/${company.userId}/${company.id}`)}
                 >
                   {/* カードヘッダー */}
                   <div className="bg-blue-700 p-6 group-hover:bg-blue-800 transition-colors">

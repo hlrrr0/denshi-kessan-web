@@ -82,7 +82,7 @@ export async function signIn(
   } catch (error: any) {
     let errorMessage = "ログインに失敗しました";
 
-    if (error.code === "auth/user-not-found" || error.code === "auth/wrong-password") {
+    if (error.code === "auth/user-not-found" || error.code === "auth/wrong-password" || error.code === "auth/invalid-credential") {
       errorMessage = "メールアドレスまたはパスワードが正しくありません";
     } else if (error.code === "auth/invalid-email") {
       errorMessage = "メールアドレスの形式が正しくありません";
@@ -104,7 +104,13 @@ export async function resetPassword(
   }
 
   try {
-    await sendPasswordResetEmail(auth, email);
+    const actionCodeSettings = {
+      url: typeof window !== "undefined" 
+        ? `${window.location.origin}/login` 
+        : "https://denshi-kessan-web.vercel.app/login",
+      handleCodeInApp: false,
+    };
+    await sendPasswordResetEmail(auth, email, actionCodeSettings);
     return { error: null };
   } catch (error: any) {
     let errorMessage = "パスワードリセットメールの送信に失敗しました";

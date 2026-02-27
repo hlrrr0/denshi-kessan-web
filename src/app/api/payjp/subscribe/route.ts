@@ -172,8 +172,7 @@ export async function POST(request: Request) {
     });
 
     // 🆕 ユーザーが所有する全企業のサブスクリプション状態を更新
-    const companiesSnapshot = await db.collection("companies")
-      .where("userId", "==", userId)
+    const companiesSnapshot = await db.collection("users").doc(userId).collection("company_information")
       .get();
     
     const batch = db.batch();

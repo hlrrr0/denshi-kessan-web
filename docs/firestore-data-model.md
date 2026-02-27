@@ -7,11 +7,11 @@ firestore/
 ├── users/
 │   └── {userId}/
 │       ├── profile (document)
-│       └── subscription (document)
-├── companies/
-│   └── {companyId}/
-│       └── notices (subcollection)
-│           └── {noticeId}/
+│       ├── subscription (document)
+│       └── company_information (subcollection)
+│           └── {companyId}/
+│               └── notices (subcollection)
+│                   └── {noticeId}/
 └── subscriptionPlans/ (定数データ)
     └── {planId}/
 ```
@@ -71,9 +71,9 @@ firestore/
   - ユーザーは期限切れ警告を見てカード情報を更新し、再登録が必要
   - 決算公告は自動的に非公開になる（一覧に表示されなくなる）
 
-## 2. companies コレクション
+## 2. company_information サブコレクション
 
-### companies/{companyId}
+### users/{userId}/company_information/{companyId}
 
 ```typescript
 {
@@ -108,15 +108,17 @@ firestore/
   - 期限切れ: クライアント側で `subscriptionExpiresAt < 現在時刻` でチェック
 - **クエリ例**:
   ```typescript
+  // 全ユーザーのcompany_informationを横断検索（collectionGroup）
   query(
-    collection(db, "companies"),
+    collectionGroup(db, "company_information"),
     where("subscriptionActive", "==", true),
     where("subscriptionExpiresAt", ">", Timestamp.now())
   )
   ```
-- **データ整合性**: ユーザーのサブスクリプション状態が真の情報源、companiesは読み取り最適化用のキャッシュ
+- **注意**: `collectionGroup` クエリを使用するため、Firestore コンソールで `company_information` コレクショングループのインデックスが必要
+- **データ整合性**: ユーザーのサブスクリプション状態が真の情報源、company_informationは読み取り最適化用のキャッシュ
 
-### companies/{companyId}/notices/{noticeId}
+### users/{userId}/company_information/{companyId}/notices/{noticeId}
 
 ```typescript
 {
@@ -129,6 +131,10 @@ firestore/
   updatedAt: Timestamp;
 }
 ```
+
+**URL構造**:
+- 決算公告一覧: `/settlements`
+- 企業詳細: `/settlements/{userId}/{companyId}`
 
 ## 3. subscriptionPlans コレクション（定数データ）
 
@@ -166,17 +172,17 @@ service cloud.firestore {
     // ユーザーは自分のデータのみアクセス可能
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-    
-    // 企業情報は所有者のみ編集、公開データは誰でも閲覧可
-    match /companies/{companyId} {
-      allow read: if true;
-      allow write: if request.auth != null && 
-                      resource.data.userId == request.auth.uid;
       
-      match /notices/{noticeId} {
+      // 企業情報サブコレクション
+      match /company_information/{companyId} {
+        // 公開データは誰でも閲覧可（collectionGroup クエリ対応）
         allow read: if true;
-        allow write: if request.auth != null;
+        allow write: if request.auth != null && request.auth.uid == userId;
+        
+        match /notices/{noticeId} {
+          allow read: if true;
+          allow write: if request.auth != null && request.auth.uid == userId;
+        }
       }
     }
     
@@ -210,7 +216,7 @@ service firebase.storage {
 | MySQL テーブル | Firestore コレクション | 備考 |
 |---------------|---------------------|------|
 | users | users/{userId} | Firebase Authと連携 |
-| company_informations | companies/{companyId} | - |
-| electronic_public_notices | companies/{companyId}/notices/{noticeId} | - |
+| company_informations | users/{userId}/company_information/{companyId} | サブコレクション |
+| electronic_public_notices | users/{userId}/company_information/{companyId}/notices/{noticeId} | ネストされたサブコレクション |
 | user_subscription_plans | users/{userId}/subscription | サブコレクション |
 | ローカルPDF | Storage: notices/{userId}/{noticeId}/ | - |

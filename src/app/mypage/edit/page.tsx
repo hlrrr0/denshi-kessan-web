@@ -3,7 +3,7 @@
 import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, setDoc, collection, query, where, getDocs, Timestamp } from "firebase/firestore";
+import { doc, setDoc, collection, getDocs, Timestamp } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import AuthGuard from "@/components/AuthGuard";
 import Header from "@/components/Header";
@@ -59,9 +59,8 @@ export default function EditCompanyPage() {
     if (!db) return;
 
     try {
-      const companiesRef = collection(db, "companies");
-      const q = query(companiesRef, where("userId", "==", uid));
-      const querySnapshot = await getDocs(q);
+      const companiesRef = collection(db, "users", uid, "company_information");
+      const querySnapshot = await getDocs(companiesRef);
 
       if (!querySnapshot.empty) {
         const companyDoc = querySnapshot.docs[0];
@@ -71,7 +70,7 @@ export default function EditCompanyPage() {
         setFormData({
           name: data.name || "",
           nameFurigana: data.nameFurigana || "",
-          establishmentDate: data.establishmentDate || "",
+          establishmentDate: data.establishmentDate?.toDate ? data.establishmentDate.toDate().toISOString().split("T")[0] : (data.establishmentDate || ""),
           representativeName: data.representativeName || "",
           capital: data.capital?.toString() || "",
           amountOfSales: data.amountOfSales?.toString() || "",
@@ -128,13 +127,13 @@ export default function EditCompanyPage() {
       };
 
       if (companyId) {
-        await setDoc(doc(db, "companies", companyId), companyData);
+        await setDoc(doc(db, "users", userId, "company_information", companyId), companyData);
         setMessage({ type: "success", text: "会社情報を更新しました。マイページに戻ります..." });
         setTimeout(() => {
           router.push("/mypage");
         }, 2000);
       } else {
-        const newCompanyRef = doc(collection(db, "companies"));
+        const newCompanyRef = doc(collection(db, "users", userId, "company_information"));
         await setDoc(newCompanyRef, {
           ...companyData,
           createdAt: Timestamp.now(),

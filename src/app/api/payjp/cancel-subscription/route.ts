@@ -72,8 +72,7 @@ export async function POST(request: Request) {
 
       // 🆕 ユーザーが所有する全企業のサブスクリプション状態を更新
       // キャンセルしても期限までは有効なので、subscriptionActiveはtrueのまま
-      const companiesSnapshot = await db.collection("companies")
-        .where("userId", "==", userId)
+      const companiesSnapshot = await db.collection("users").doc(userId).collection("company_information")
         .get();
       
       if (!companiesSnapshot.empty) {

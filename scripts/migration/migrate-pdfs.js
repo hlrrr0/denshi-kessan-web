@@ -92,10 +92,9 @@ async function migratePDFs() {
       console.log(`✅ Uploaded PDF: ${notice.uuid}`);
       successCount++;
 
-      // Firestore にメタ情報を保存（companiesから該当を探す）
+      // Firestore にメタ情報を保存（users/{uid}/company_information から該当を探す）
       const companiesSnapshot = await db
-        .collection('companies')
-        .where('userId', '==', firebaseUserId)
+        .collection('users').doc(firebaseUserId).collection('company_information')
         .limit(1)
         .get();
 

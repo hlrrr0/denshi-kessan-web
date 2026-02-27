@@ -34,8 +34,7 @@ async function updateCompanySubscriptionStatus(
   expiresAt: admin.firestore.Timestamp
 ) {
   const companiesSnapshot = await db
-    .collection("companies")
-    .where("userId", "==", userId)
+    .collection("users").doc(userId).collection("company_information")
     .get();
 
   if (companiesSnapshot.empty) return;

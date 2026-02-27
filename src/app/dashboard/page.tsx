@@ -3,7 +3,7 @@
 import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, setDoc, collection, query, where, getDocs, Timestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, getDocs, Timestamp } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import AuthGuard from "@/components/AuthGuard";
 import Header from "@/components/Header";
@@ -62,9 +62,8 @@ export default function DashboardPage() {
 
     try {
       // ユーザーが登録した会社情報を取得
-      const companiesRef = collection(db, "companies");
-      const q = query(companiesRef, where("userId", "==", uid));
-      const querySnapshot = await getDocs(q);
+      const companiesRef = collection(db, "users", uid, "company_information");
+      const querySnapshot = await getDocs(companiesRef);
 
       if (!querySnapshot.empty) {
         const companyDoc = querySnapshot.docs[0];
@@ -74,7 +73,7 @@ export default function DashboardPage() {
         setFormData({
           name: data.name || "",
           nameFurigana: data.nameFurigana || "",
-          establishmentDate: data.establishmentDate || "",
+          establishmentDate: data.establishmentDate?.toDate ? data.establishmentDate.toDate().toISOString().split("T")[0] : (data.establishmentDate || ""),
           representativeName: data.representativeName || "",
           capital: data.capital?.toString() || "",
           amountOfSales: data.amountOfSales?.toString() || "",
@@ -133,7 +132,7 @@ export default function DashboardPage() {
 
       if (companyId) {
         // 更新
-        await setDoc(doc(db, "companies", companyId), companyData);
+        await setDoc(doc(db, "users", userId, "company_information", companyId), companyData);
         setMessage({ type: "success", text: "会社情報を更新しました。ダッシュボードを再読み込みします..." });
         
         // 2秒後にページをリロード
@@ -142,7 +141,7 @@ export default function DashboardPage() {
         }, 2000);
       } else {
         // 新規登録
-        const newCompanyRef = doc(collection(db, "companies"));
+        const newCompanyRef = doc(collection(db, "users", userId, "company_information"));
         await setDoc(newCompanyRef, {
           ...companyData,
           createdAt: Timestamp.now(),

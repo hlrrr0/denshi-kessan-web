@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { collection, query, where, getDocs, doc, getDoc, deleteDoc } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc, deleteDoc } from "firebase/firestore";
 import { ref, deleteObject } from "firebase/storage";
 import { auth, db, storage } from "@/lib/firebase";
 import AuthGuard from "@/components/AuthGuard";
@@ -125,10 +125,9 @@ export default function MyPage() {
         });
       }
 
-      // 会社情報を取得
-      const companiesRef = collection(db, "companies");
-      const companyQuery = query(companiesRef, where("userId", "==", currentUser.uid));
-      const companySnapshot = await getDocs(companyQuery);
+      // 会社情報を取得（users/{uid}/company_information サブコレクション）
+      const companiesRef = collection(db, "users", currentUser.uid, "company_information");
+      const companySnapshot = await getDocs(companiesRef);
 
       if (!companySnapshot.empty) {
         const companyDoc = companySnapshot.docs[0];
@@ -137,7 +136,7 @@ export default function MyPage() {
           id: companyDoc.id,
           name: data.name || "",
           nameFurigana: data.nameFurigana || "",
-          establishmentDate: data.establishmentDate || "",
+          establishmentDate: data.establishmentDate?.toDate ? data.establishmentDate.toDate().toLocaleDateString("ja-JP") : (data.establishmentDate || ""),
           representativeName: data.representativeName || "",
           capital: data.capital || 0,
           amountOfSales: data.amountOfSales || 0,
@@ -149,7 +148,7 @@ export default function MyPage() {
         });
 
         // 決算公告を取得
-        const noticesRef = collection(db, "companies", companyDoc.id, "notices");
+        const noticesRef = collection(db, "users", currentUser.uid, "company_information", companyDoc.id, "notices");
         const noticesSnapshot = await getDocs(noticesRef);
         const noticesData = noticesSnapshot.docs.map(doc => ({
           id: doc.id,
@@ -182,7 +181,7 @@ export default function MyPage() {
       }
 
       // Firestore からドキュメントを削除
-      await deleteDoc(doc(db, "companies", companyData.id, "notices", notice.id));
+      await deleteDoc(doc(db, "users", user!.uid, "company_information", companyData.id, "notices", notice.id));
 
       // ローカルステートを更新
       setNotices((prev) => prev.filter((n) => n.id !== notice.id));
@@ -193,8 +192,8 @@ export default function MyPage() {
     }
   };
 
-  const settlementUrl = companyData
-    ? `${typeof window !== "undefined" ? window.location.origin : ""}/settlements/${companyData.id}`
+  const settlementUrl = companyData && user
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/settlements/${user.uid}/${companyData.id}`
     : "";
 
   const copyToClipboard = async () => {

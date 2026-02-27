@@ -32,7 +32,8 @@ interface NoticeData {
 export default function SettlementDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const companyId = params.id as string;
+  const userId = params.userId as string;
+  const companyId = params.companyId as string;
   
   const [company, setCompany] = useState<CompanyData | null>(null);
   const [notices, setNotices] = useState<NoticeData[]>([]);
@@ -40,24 +41,28 @@ export default function SettlementDetailPage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!db || !companyId) {
+      if (!db || !userId || !companyId) {
         setLoading(false);
         return;
       }
 
       try {
-        // 会社情報を取得
-        const companyRef = doc(db, "companies", companyId);
+        // 会社情報を取得（users/{userId}/company_information/{companyId}）
+        const companyRef = doc(db, "users", userId, "company_information", companyId);
         const companySnap = await getDoc(companyRef);
 
         if (companySnap.exists()) {
+          const rawData = companySnap.data();
           setCompany({
             id: companySnap.id,
-            ...companySnap.data()
+            ...rawData,
+            establishmentDate: rawData.establishmentDate?.toDate 
+              ? rawData.establishmentDate.toDate().toLocaleDateString("ja-JP") 
+              : (rawData.establishmentDate || ""),
           } as CompanyData);
 
           // 決算公告を取得
-          const noticesRef = collection(db, "companies", companyId, "notices");
+          const noticesRef = collection(db, "users", userId, "company_information", companyId, "notices");
           const noticesQuery = query(noticesRef, orderBy("createdAt", "desc"));
           const noticesSnap = await getDocs(noticesQuery);
           
@@ -75,7 +80,7 @@ export default function SettlementDetailPage() {
     };
 
     fetchData();
-  }, [companyId]);
+  }, [userId, companyId]);
 
   if (loading) {
     return (

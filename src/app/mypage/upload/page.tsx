@@ -3,7 +3,7 @@
 import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { collection, query, where, getDocs, doc, setDoc, Timestamp } from "firebase/firestore";
+import { collection, getDocs, doc, setDoc, Timestamp } from "firebase/firestore";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { auth, db, storage } from "@/lib/firebase";
 import AuthGuard from "@/components/AuthGuard";
@@ -36,9 +36,8 @@ export default function UploadPage() {
     if (!db) return;
 
     try {
-      const companiesRef = collection(db, "companies");
-      const companyQuery = query(companiesRef, where("userId", "==", uid));
-      const companySnapshot = await getDocs(companyQuery);
+      const companiesRef = collection(db, "users", uid, "company_information");
+      const companySnapshot = await getDocs(companiesRef);
 
       if (!companySnapshot.empty) {
         const companyDoc = companySnapshot.docs[0];
@@ -120,7 +119,7 @@ export default function UploadPage() {
               throw new Error("Firestore is not initialized");
             }
             
-            const noticeRef = doc(collection(db, "companies", companyId, "notices"));
+            const noticeRef = doc(collection(db, "users", user.uid, "company_information", companyId, "notices"));
             const noticeData = {
               uuid: noticeRef.id,
               userId: user.uid,
