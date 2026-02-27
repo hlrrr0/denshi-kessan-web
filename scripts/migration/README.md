@@ -1,97 +1,146 @@
 # データ移行手順
 
-## 前提条件
+旧サイト（Rails + MySQL + Lightsail ローカルストレージ）から  
+新サイト（Next.js + Firebase Auth + Firestore + Firebase Storage）へのデータ移行手順です。
 
-1. Firebase プロジェクトが作成済み
-2. Firebase Admin SDK の認証情報（サービスアカウントキー）を取得済み
-3. MySQL データベースへのアクセス権限
-4. Lightsail インスタンスへの SSH アクセス権限
+---
 
-## ステップ1: MySQLからデータをエクスポート
+## 全体フロー
 
-### 1-1. SSH接続してMySQLダンプを取得
-
-```bash
-# Lightsailインスタンスに接続
-ssh user@your-lightsail-instance
-
-# MySQLデータをJSON形式でエクスポート
-mysql -u root -p denshi_kessan_production -e \
-  "SELECT * FROM users" \
-  | ./scripts/mysql_to_json.sh > users.json
-
-mysql -u root -p denshi_kessan_production -e \
-  "SELECT * FROM company_informations" \
-  | ./scripts/mysql_to_json.sh > companies.json
-
-mysql -u root -p denshi_kessan_production -e \
-  "SELECT * FROM electronic_public_notices" \
-  | ./scripts/mysql_to_json.sh > notices.json
-
-mysql -u root -p denshi_kessan_production -e \
-  "SELECT * FROM user_subscription_plans" \
-  | ./scripts/mysql_to_json.sh > subscriptions.json
+```
+旧サイト（Lightsail）
+  ↓ ① rake migration:export  →  tmp/migration_export/
+  ↓ ② scp でローカルにダウンロード  →  migration-data/
+新サイト（このリポジトリ）
+  ↓ ③ migrate-users.js        → Firebase Auth + /users/{uid}
+  ↓ ④ migrate-companies.js    → /users/{uid}/company_information
+  ↓ ⑤ migrate-subscriptions.js → /users/{uid}/subscription_plans
+  ↓ ⑥ migrate-notices.js      → Firebase Storage + /electronic_public_notices
+  ↓ ⑦ verify-migration.js     → 件数・整合性チェック
 ```
 
-### 1-2. PDFファイルをtarで固める
+---
+
+## Firestore コレクション設計
+
+| MySQL テーブル               | Firestore パス                                      |
+| ----------------------------- | --------------------------------------------------- |
+| users                         | `/users/{uid}`                                      |
+| company_informations          | `/users/{uid}/company_information/{docId}`          |
+| user_subscription_plans       | `/users/{uid}/subscription_plans/{legacyId}`        |
+| electronic_public_notices     | `/electronic_public_notices/{uuid}`                 |
+| Active Storage（PDF）         | Firebase Storage `notices/{uid}/{uuid}.pdf`         |
+
+---
+
+## 事前準備
+
+### 1. Firebase プロジェクトの設定確認
+- Firebase Console でプロジェクトを作成済みであること
+- Authentication（メール/パスワード）を有効化
+- Firestore Database を作成
+- Storage を作成
+
+### 2. サービスアカウントキーを配置
 
 ```bash
-cd /var/www/denshi-kessan-koukoku/shared/public/storage/
-tar -czf ~/pdfs_backup.tar.gz .
+# Firebase Console > プロジェクト設定 > サービスアカウント
+# 「新しい秘密鍵の生成」でダウンロード
+cp ~/Downloads/serviceAccountKey.json scripts/migration/serviceAccountKey.json
 ```
 
-### 1-3. ローカルにダウンロード
+### 3. migrate-notices.js の Storage バケット名を設定
+
+`scripts/migration/migrate-notices.js` の以下の行を実際のプロジェクト ID に修正するか、
+環境変数で指定します。
 
 ```bash
-# ローカルマシンで実行
-scp user@your-lightsail-instance:~/users.json ./migration-data/
-scp user@your-lightsail-instance:~/companies.json ./migration-data/
-scp user@your-lightsail-instance:~/notices.json ./migration-data/
-scp user@your-lightsail-instance:~/subscriptions.json ./migration-data/
-scp user@your-lightsail-instance:~/pdfs_backup.tar.gz ./migration-data/
+export FIREBASE_STORAGE_BUCKET=your-project-id.appspot.com
 ```
 
-## ステップ2: Firebase Admin SDKのセットアップ
+### 4. 依存パッケージのインストール
 
 ```bash
-npm install --save-dev firebase-admin
+npm install
 ```
 
-## ステップ3: サービスアカウントキーを配置
+---
+
+## ステップ 1: 旧サイトからデータをエクスポート
+
+Lightsail サーバにて：
 
 ```bash
-# Firebase Console > Project Settings > Service Accounts
-# 「Generate new private key」でダウンロード
-
-cp ~/Downloads/serviceAccountKey.json ./scripts/migration/
+# Rails アプリのルートで実行
+bundle exec rake migration:export
+# → tmp/migration_export/ に出力される
 ```
 
-## ステップ4: データ移行スクリプトを実行
+### ローカルにダウンロード（Mac で実行）
 
 ```bash
-# 1. ユーザーデータを移行（Firebase Authユーザー作成含む）
+scp -r -i ~/.ssh/your-key.pem \
+  ubuntu@xxx.xxx.xxx.xxx:/var/www/your-app/tmp/migration_export/ \
+  ~/Desktop/migration_export/
+```
+
+`~/Desktop/migration_export/` の構成：
+
+```
+~/Desktop/migration_export/
+  ├── users.json
+  ├── company_informations.json
+  ├── electronic_public_notices.json
+  ├── user_subscription_plans.json
+  └── pdfs/
+        ├── {uuid}.pdf
+        └── ...
+```
+
+---
+
+## ステップ 2: 移行スクリプトを実行（順番通りに）
+
+```bash
+# 1. ユーザー（Firebase Auth + Firestore /users/{uid}）
 npm run migrate:users
+# → scripts/migration/uid-mapping.json が生成される（後続スクリプトが参照）
 
-# 2. 企業情報を移行
+# 2. 企業情報（/users/{uid}/company_information）
 npm run migrate:companies
 
-# 3. サブスクリプション情報を移行
+# 3. サブスクリプション（/users/{uid}/subscription_plans）
 npm run migrate:subscriptions
 
-# 4. PDFファイルをStorageにアップロード
-npm run migrate:pdfs
-
-# 5. 決算公告メタ情報を移行
+# 4. 決算公告 + PDF（Firebase Storage + /electronic_public_notices）
 npm run migrate:notices
-```
 
-## ステップ5: データ検証
-
-```bash
+# 5. 検証（件数・整合性チェック）
 npm run verify:migration
 ```
 
-## ステップ6: 価格改定後の既存契約者データ移行
+> ⚠️ **実行順序は必ず守ってください。**  
+> `migrate-users.js` が生成する `uid-mapping.json` を後続スクリプトが参照します。
+
+---
+
+## ステップ 3: パスワードを引き継ぐ
+
+旧サイト（Sorcery）のBCryptハッシュをそのまま Firebase Auth にインポートします。  
+ユーザーは**旧サイトと同じパスワードでログイン可能**になります。
+
+```bash
+# 旧サイトで暗号化パスワードをエクスポート
+bundle exec rake migration:export_passwords
+# → tmp/migration_export/encrypted_passwords.json
+
+# Mac にコピー後、インポート実行
+npm run import:passwords
+```
+
+---
+
+## ステップ 4: 価格改定後の既存契約者データ移行（必要な場合）
 
 価格改定を行った後、既存契約者が旧価格で継続できるようにデータを更新します。
 
@@ -113,30 +162,14 @@ node scripts/migration/update-legacy-subscriptions.js
 4. `subscriptionPlanId` を `1year_legacy` または `5year_legacy` に更新
 5. `actualPrice` フィールドに実際の契約価格を保存
 
-### 実行結果の例
-
-```
-既存契約者のデータ移行を開始します...
-
-ユーザー abc123: サブスクリプションID sub_xxx, プランID yearly_plan_980
-✅ ユーザー abc123: 1year → 1year_legacy (980円) に更新しました
-
-ユーザー def456: チャージID ch_yyy, 金額 3920円
-✅ ユーザー def456: 5year → 5year_legacy (3920円) に更新しました
-
-ユーザー ghi789: 新価格プラン（更新不要）
-
-=== 移行完了 ===
-更新: 2件
-スキップ: 1件
-エラー: 0件
-合計: 3件
-```
+---
 
 ## 注意事項
 
-- **本番データのバックアップを必ず取得してから実行**
+- **本番データの移行前に必ずバックアップを取得してください**
 - 移行中は旧システムを読み取り専用にすることを推奨
-- Firebase の無料枠に注意（特にStorage容量とFirestore書き込み数）
+- `uid-mapping.json` には全ユーザーの Firebase UID が含まれます。Git にコミットしないでください（`.gitignore` に追加済み）
+- `serviceAccountKey.json` も Git にコミットしないでください（`.gitignore` 対象）
+- Firebase の無料枠に注意（特に Storage 容量と Firestore 書き込み数）
 - payjp_customer_id などの決済情報は慎重に扱う
 - 価格改定後は既存契約者の自動更新が旧価格で継続されることを確認

@@ -10,7 +10,11 @@
     "test": "jest",
     "migrate:users": "node scripts/migration/migrate-users.js",
     "migrate:companies": "node scripts/migration/migrate-companies.js",
-    "migrate:pdfs": "node scripts/migration/migrate-pdfs.js"
+    "migrate:notices": "node scripts/migration/migrate-notices.js",
+    "migrate:subscriptions": "node scripts/migration/migrate-subscriptions.js",
+    "migrate:pdfs": "node scripts/migration/migrate-pdfs.js",
+    "import:passwords": "node scripts/migration/import-passwords.js",
+    "verify:migration": "node scripts/migration/verify-migration.js"
   },
   "dependencies": {
     "@payjp/payjpv2": "^1.0.5",

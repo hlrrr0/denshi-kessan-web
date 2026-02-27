@@ -1,0 +1,31 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── users ────────────────────────────────────────────────
+    // 自分のドキュメントのみ読み書き可能
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      // company_information サブコレクション
+      match /company_information/{docId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // subscription_plans サブコレクション
+      match /subscription_plans/{docId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // ── electronic_public_notices ────────────────────────────
+    // 読み取りは誰でも可（公開ページ用）
+    // 書き込みは本人のみ
+    match /electronic_public_notices/{noticeId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null
+                            && resource.data.userId == request.auth.uid;
+    }
+  }
+}
