@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { collection, query, where, getDocs, doc, getDoc, deleteDoc } from "firebase/firestore";
+import { ref, deleteObject } from "firebase/storage";
+import { auth, db, storage } from "@/lib/firebase";
 import AuthGuard from "@/components/AuthGuard";
 import Header from "@/components/Header";
 import { SUBSCRIPTION_PLANS, getAvailablePlans, formatPrice } from "@/lib/payjp";
@@ -46,6 +47,7 @@ interface NoticeData {
   id: string;
   title: string;
   pdfUrl: string;
+  pdfPath?: string;
   createdAt: any;
 }
 
@@ -58,6 +60,7 @@ export default function MyPage() {
   const [notices, setNotices] = useState<NoticeData[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
     if (!auth || !db) return;
@@ -156,6 +159,37 @@ export default function MyPage() {
       } else {
       }
     } catch (error: any) {
+    }
+  };
+
+  const handleDeleteNotice = async (notice: NoticeData) => {
+    if (!confirm(`「${notice.title}」を削除しますか？\nこの操作は取り消せません。`)) return;
+    if (!db || !companyData) return;
+
+    setDeleting(notice.id);
+    try {
+      // Firebase Storage からPDFを削除
+      if (notice.pdfPath && storage) {
+        try {
+          const storageRef = ref(storage, notice.pdfPath);
+          await deleteObject(storageRef);
+        } catch (storageError: any) {
+          // ファイルが既に存在しない場合は無視
+          if (storageError.code !== "storage/object-not-found") {
+            throw storageError;
+          }
+        }
+      }
+
+      // Firestore からドキュメントを削除
+      await deleteDoc(doc(db, "companies", companyData.id, "notices", notice.id));
+
+      // ローカルステートを更新
+      setNotices((prev) => prev.filter((n) => n.id !== notice.id));
+    } catch (error: any) {
+      alert("削除に失敗しました。もう一度お試しください。");
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -433,9 +467,11 @@ export default function MyPage() {
                           表示
                         </a>
                         <button
-                          className="px-4 py-2 border-2 border-red-600 text-red-600 text-sm font-bold hover:bg-red-50"
+                          onClick={() => handleDeleteNotice(notice)}
+                          disabled={deleting === notice.id}
+                          className="px-4 py-2 border-2 border-red-600 text-red-600 text-sm font-bold hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          削除
+                          {deleting === notice.id ? "削除中..." : "削除"}
                         </button>
                       </div>
                     </div>

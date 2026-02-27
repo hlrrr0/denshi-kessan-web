@@ -14,7 +14,7 @@
 - [x] 6. **Pay.jp Webhook実装** — `/api/payjp/route.ts` で `subscription.renewed` / `charge.failed` / `subscription.deleted` を処理
 - [x] 7. **パスワードリセット機能** — ログインページに「パスワードを忘れた方」導線 + `resetPassword` 関数追加
 - [x] 8. **`error.tsx` / `not-found.tsx` 追加** — エラーバウンダリ、404表示、global-error.tsx
-- [ ] 9. **決算公告の削除機能** — マイページの「削除」ボタンのonClick未実装
+- [x] 9. **決算公告の削除機能** — Storage PDF削除 + Firestoreドキュメント削除 + 確認ダイアログ
 - [ ] 10. **LPのプレースホルダー画像差し替え** — `[管理画面イメージ]` 等のモックテキスト3箇所
 - [ ] 11. **`robots.txt` / `sitemap.xml` 作成** — SEO基本ファイル
 - [ ] 12. **`.env.example` 作成** — 環境変数12個のサンプルファイル
