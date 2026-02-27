@@ -37,7 +37,7 @@ export default function Header() {
       <nav className="container mx-auto px-4 py-4">
         <div className="flex justify-between items-center">
           <a href="/" className="text-xl font-bold text-gray-800">
-            電子決算公告
+            電子決算公告ドットコム
           </a>
           
           <div className="flex items-center gap-4">

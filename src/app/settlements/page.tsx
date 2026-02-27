@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, query, where, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Header from "@/components/Header";
 
@@ -19,8 +19,14 @@ export default function SettlementsPage() {
       }
       
       try {
-        // 全企業を取得
-        const snap = await getDocs(collection(db, "companies"));
+        // サブスクリプションが有効な企業のみ取得
+        const now = Timestamp.now();
+        const q = query(
+          collection(db, "companies"),
+          where("subscriptionActive", "==", true),
+          where("subscriptionExpiresAt", ">", now)
+        );
+        const snap = await getDocs(q);
         const allCompanies = snap.docs.map(doc => ({ 
           id: doc.id, 
           ...doc.data() 

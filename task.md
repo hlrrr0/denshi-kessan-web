@@ -6,7 +6,7 @@
 - [x] 2. **APIルートに認証チェック追加** — Firebase Auth IDトークン検証。他人のuserIdでの操作防止
 - [x] 3. **`firebase-admin` を dependencies に移動** — devDependencies→dependencies。Vercelデプロイ時のビルドエラー防止
 - [x] 4. **`console.log` の削除** — 50箇所以上のデバッグログ。UID・カードID等の機密データ出力を除去
-- [ ] 5. **公告一覧のフィルタリング** — サブスクリプション未契約企業を非表示にする
+- [x] 5. **公告一覧のフィルタリング** — サブスクリプション未契約企業を非表示にする
 
 ## P1 — 強く推奨
 
