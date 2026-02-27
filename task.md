@@ -7,10 +7,11 @@
 - [x] 3. **`firebase-admin` を dependencies に移動** — devDependencies→dependencies。Vercelデプロイ時のビルドエラー防止
 - [x] 4. **`console.log` の削除** — 50箇所以上のデバッグログ。UID・カードID等の機密データ出力を除去
 - [x] 5. **公告一覧のフィルタリング** — サブスクリプション未契約企業を非表示にする
+- [x] 5b. **Vercelビルド修正** — Pay.jp SDK遅延初期化 + useSearchParams Suspense境界追加
 
 ## P1 — 強く推奨
 
-- [ ] 6. **Pay.jp Webhook実装** — `/api/payjp/route.ts` が空実装。定期課金失敗の検知
+- [x] 6. **Pay.jp Webhook実装** — `/api/payjp/route.ts` で `subscription.renewed` / `charge.failed` / `subscription.deleted` を処理
 - [ ] 7. **パスワードリセット機能** — ログインページに「パスワードを忘れた方」導線
 - [ ] 8. **`error.tsx` / `not-found.tsx` 追加** — エラーバウンダリ、404表示
 - [ ] 9. **決算公告の削除機能** — マイページの「削除」ボタンのonClick未実装
