@@ -2,7 +2,7 @@
 
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { signIn } from "@/lib/auth";
+import { signIn, resetPassword } from "@/lib/auth";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,6 +12,10 @@ export default function LoginPage() {
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showResetForm, setShowResetForm] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMessage, setResetMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -46,6 +50,27 @@ export default function LoginPage() {
       ...formData,
       [e.target.id]: e.target.value,
     });
+  };
+
+  const handleResetPassword = async (e: FormEvent) => {
+    e.preventDefault();
+    setResetMessage(null);
+
+    if (!resetEmail) {
+      setResetMessage({ type: "error", text: "メールアドレスを入力してください" });
+      return;
+    }
+
+    setResetLoading(true);
+    const result = await resetPassword(resetEmail);
+    setResetLoading(false);
+
+    if (result.error) {
+      setResetMessage({ type: "error", text: result.error });
+    } else {
+      setResetMessage({ type: "success", text: "パスワードリセットメールを送信しました。メールをご確認ください。" });
+      setResetEmail("");
+    }
   };
 
   return (
@@ -98,6 +123,56 @@ export default function LoginPage() {
             {loading ? "ログイン中..." : "ログイン"}
           </button>
         </form>
+
+        <div className="mt-4 text-center">
+          <button
+            type="button"
+            onClick={() => { setShowResetForm(!showResetForm); setResetMessage(null); }}
+            className="text-sm text-blue-600 hover:underline"
+          >
+            パスワードをお忘れの方
+          </button>
+        </div>
+
+        {showResetForm && (
+          <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+            <h2 className="text-sm font-semibold mb-2">パスワードリセット</h2>
+            <p className="text-xs text-gray-600 mb-3">
+              登録済みのメールアドレスを入力してください。パスワードリセット用のメールをお送りします。
+            </p>
+
+            {resetMessage && (
+              <div
+                className={`mb-3 p-2 text-sm rounded ${
+                  resetMessage.type === "success"
+                    ? "bg-green-100 border border-green-400 text-green-700"
+                    : "bg-red-100 border border-red-400 text-red-700"
+                }`}
+              >
+                {resetMessage.text}
+              </div>
+            )}
+
+            <form onSubmit={handleResetPassword} className="space-y-3">
+              <input
+                type="email"
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                placeholder="メールアドレス"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+                disabled={resetLoading}
+              />
+              <button
+                type="submit"
+                disabled={resetLoading}
+                className="w-full bg-gray-700 text-white py-2 rounded-md text-sm hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+              >
+                {resetLoading ? "送信中..." : "リセットメールを送信"}
+              </button>
+            </form>
+          </div>
+        )}
 
         <p className="mt-4 text-center text-sm">
           アカウントをお持ちでない方は

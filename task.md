@@ -12,7 +12,7 @@
 ## P1 — 強く推奨
 
 - [x] 6. **Pay.jp Webhook実装** — `/api/payjp/route.ts` で `subscription.renewed` / `charge.failed` / `subscription.deleted` を処理
-- [ ] 7. **パスワードリセット機能** — ログインページに「パスワードを忘れた方」導線
+- [x] 7. **パスワードリセット機能** — ログインページに「パスワードを忘れた方」導線 + `resetPassword` 関数追加
 - [ ] 8. **`error.tsx` / `not-found.tsx` 追加** — エラーバウンダリ、404表示
 - [ ] 9. **決算公告の削除機能** — マイページの「削除」ボタンのonClick未実装
 - [ ] 10. **LPのプレースホルダー画像差し替え** — `[管理画面イメージ]` 等のモックテキスト3箇所

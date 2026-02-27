@@ -2,6 +2,7 @@ import {
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
+  sendPasswordResetEmail,
   User
 } from "firebase/auth";
 import { doc, setDoc, getDoc, Timestamp } from "firebase/firestore";
@@ -91,6 +92,33 @@ export async function signIn(
 
     console.error("Sign in error:", error);
     return { user: null, error: errorMessage };
+  }
+}
+
+// パスワードリセット
+export async function resetPassword(
+  email: string
+): Promise<{ error: null } | { error: string }> {
+  if (!auth) {
+    return { error: "Firebase の初期化に失敗しました" };
+  }
+
+  try {
+    await sendPasswordResetEmail(auth, email);
+    return { error: null };
+  } catch (error: any) {
+    let errorMessage = "パスワードリセットメールの送信に失敗しました";
+
+    if (error.code === "auth/user-not-found") {
+      // セキュリティ上、ユーザーが存在しない場合も成功扱いにする
+      return { error: null };
+    } else if (error.code === "auth/invalid-email") {
+      errorMessage = "メールアドレスの形式が正しくありません";
+    } else if (error.code === "auth/too-many-requests") {
+      errorMessage = "送信回数が多すぎます。しばらく待ってから再試行してください";
+    }
+
+    return { error: errorMessage };
   }
 }
 
