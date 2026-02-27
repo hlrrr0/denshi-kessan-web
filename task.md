@@ -17,11 +17,11 @@
 - [x] 9. **決算公告の削除機能** — Storage PDF削除 + Firestoreドキュメント削除 + 確認ダイアログ
 - [x] 10. **LPのプレースホルダー画像差し替え** — HTML/CSSベースのUIモックに置換（2箇所）
 - [x] 11. **`robots.txt` / `sitemap.xml` 作成** — App Router方式（robots.ts / sitemap.ts）
-- [ ] 12. **`.env.example` 作成** — 環境変数12個のサンプルファイル
+- [x] 12. **`.env.example` 作成** — 環境変数14個（Firebase 8 + Pay.jp 2 + reCAPTCHA 2）
 
 ## P2 — 推奨
 
-- [ ] 13. OGPメタデータ設定
+- [x] 13. **OGPメタデータ設定** — OpenGraph / Twitter Card / canonical / metadataBase
 - [ ] 14. セキュリティヘッダー追加（`next.config.ts` にCSP等）
 - [ ] 15. モバイルハンバーガーメニュー
 - [ ] 16. `.backup` ファイル削除（2ファイル残存）
