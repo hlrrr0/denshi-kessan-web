@@ -24,7 +24,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     autoRenewal: true,
     paymentType: "subscription",
     legacy: true,
-    payjpPlanId: "yearly_plan_980",
+    payjpPlanId: "pln_181d9ca4c9718408374dca080d64",
   },
   {
     id: "5year_legacy",
@@ -45,7 +45,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     description: "1年ごとに自動で更新されます。いつでもキャンセル可能。",
     autoRenewal: true,
     paymentType: "subscription",
-    payjpPlanId: "yearly_plan_3960",
+    payjpPlanId: "pln_9196b4ba12f7969ad319d756430c",
   },
   {
     id: "5year",

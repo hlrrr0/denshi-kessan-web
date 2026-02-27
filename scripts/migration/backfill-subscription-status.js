@@ -127,14 +127,12 @@ async function backfillFromPayjp() {
           expirationDate.setFullYear(expirationDate.getFullYear() + 1);
         }
 
-        // プランIDを判定
-        const payjpPlanId = activeSub.plan?.id;
-        if (payjpPlanId === 'yearly_plan_980') {
+        // プランIDを金額ベースで判定
+        const planAmount = activeSub.plan?.amount;
+        if (planAmount && planAmount <= 980) {
           planId = '1year_legacy';
-        } else if (payjpPlanId === 'yearly_plan_3960') {
-          planId = '1year';
         } else {
-          planId = '1year'; // デフォルト
+          planId = '1year';
         }
       } else if (pausedSub) {
         // キャンセル済みだが期間内の場合
@@ -144,10 +142,11 @@ async function backfillFromPayjp() {
           expirationDate = new Date(periodEnd * 1000);
           payjpId = pausedSub.id;
           payjpType = 'subscription';
-          automaticRenewal = false; // キャンセル済みなので自動更新なし
+          // paused = 一時停止（Pay.jpが自動更新を試みて失敗した状態）、canceled = ユーザーがキャンセル
+          automaticRenewal = pausedSub.status === 'paused'; // paused は自動更新あり、canceled は自動更新なし
 
-          const payjpPlanId = pausedSub.plan?.id;
-          if (payjpPlanId === 'yearly_plan_980') {
+          const planAmount = pausedSub.plan?.amount;
+          if (planAmount && planAmount <= 980) {
             planId = '1year_legacy';
           } else {
             planId = '1year';

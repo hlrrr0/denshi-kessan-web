@@ -181,7 +181,7 @@ export default function BillingHistoryPage() {
               <h3 className="font-semibold mb-2">ご注意</h3>
               <ul className="text-sm text-gray-600 space-y-1">
                 <li>• 決済履歴は過去2年分まで表示されます</li>
-                <li>• 決済に関するお問い合わせは support@denshi-kessan-koukoku.com までご連絡ください</li>
+                <li>• 決済に関するお問い合わせは support-denshi-koukoku@xiami.jp までご連絡ください</li>
               </ul>
             </div>
           </div>

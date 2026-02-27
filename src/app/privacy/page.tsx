@@ -121,9 +121,8 @@ export default function PrivacyPage() {
               本ポリシーに関するお問い合わせは、下記の窓口までお願いいたします。
             </p>
             <div className="mt-3 bg-white border border-gray-200 rounded-lg p-4 text-sm">
-              <p>電子決算公告ドットコム運営事務局</p>
-              {/* TODO: 実際の連絡先に差し替えてください */}
-              <p>メールアドレス：info@denshi-kessan-koukoku.com</p>
+              <p>合同会社XIAMI</p>
+              <p>メールアドレス：support-denshi-koukoku@xiami.jp</p>
             </div>
           </section>
         </div>

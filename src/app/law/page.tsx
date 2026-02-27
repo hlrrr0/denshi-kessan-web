@@ -23,8 +23,7 @@ export default function LawPage() {
                   販売事業者名
                 </th>
                 <td className="px-6 py-4 text-gray-800">
-                  {/* TODO: 実際の事業者名に差し替えてください */}
-                  電子決算公告ドットコム運営事務局
+                  合同会社XIAMI
                 </td>
               </tr>
               <tr className="border-b border-gray-200">
@@ -32,8 +31,7 @@ export default function LawPage() {
                   代表者名
                 </th>
                 <td className="px-6 py-4 text-gray-800">
-                  {/* TODO: 実際の代表者名に差し替えてください */}
-                  ○○ ○○
+                  今井
                 </td>
               </tr>
               <tr className="border-b border-gray-200">
@@ -41,9 +39,8 @@ export default function LawPage() {
                   所在地
                 </th>
                 <td className="px-6 py-4 text-gray-800">
-                  {/* TODO: 実際の所在地に差し替えてください */}
-                  〒000-0000<br />
-                  東京都○○区○○ 0-0-0
+                  〒662-0085<br />
+                  兵庫県西宮市老松町18-5
                 </td>
               </tr>
               <tr className="border-b border-gray-200">
@@ -51,9 +48,7 @@ export default function LawPage() {
                   電話番号
                 </th>
                 <td className="px-6 py-4 text-gray-800">
-                  {/* TODO: 実際の電話番号に差し替えてください */}
-                  00-0000-0000<br />
-                  <span className="text-gray-500 text-xs">※お問い合わせはメールにてお願いいたします</span>
+                  お問い合わせはメールにてお願いいたします
                 </td>
               </tr>
               <tr className="border-b border-gray-200">
@@ -61,8 +56,7 @@ export default function LawPage() {
                   メールアドレス
                 </th>
                 <td className="px-6 py-4 text-gray-800">
-                  {/* TODO: 実際のメールアドレスに差し替えてください */}
-                  info@denshi-kessan-koukoku.com
+                  support-denshi-koukoku@xiami.jp
                 </td>
               </tr>
               <tr className="border-b border-gray-200">
