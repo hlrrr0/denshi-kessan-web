@@ -16,7 +16,7 @@
 - [x] 8. **`error.tsx` / `not-found.tsx` 追加** — エラーバウンダリ、404表示、global-error.tsx
 - [x] 9. **決算公告の削除機能** — Storage PDF削除 + Firestoreドキュメント削除 + 確認ダイアログ
 - [x] 10. **LPのプレースホルダー画像差し替え** — HTML/CSSベースのUIモックに置換（2箇所）
-- [ ] 11. **`robots.txt` / `sitemap.xml` 作成** — SEO基本ファイル
+- [x] 11. **`robots.txt` / `sitemap.xml` 作成** — App Router方式（robots.ts / sitemap.ts）
 - [ ] 12. **`.env.example` 作成** — 環境変数12個のサンプルファイル
 
 ## P2 — 推奨
