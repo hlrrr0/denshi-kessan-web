@@ -34,7 +34,7 @@ export default function SettlementsPage() {
               const userId = companyDoc.ref.parent.parent?.id || "";
               
               // userのlegacyUuidを取得
-              const userDocRef = doc(db, "users", userId);
+              const userDocRef = doc(db!, "users", userId);
               const userDocSnap = await getDoc(userDocRef);
               const legacyUuid = userDocSnap.exists() ? userDocSnap.data().legacyUuid : null;
               
@@ -68,7 +68,7 @@ export default function SettlementsPage() {
               const userId = companyDoc.ref.parent.parent?.id || "";
               
               // userのlegacyUuidを取得
-              const userDocRef = doc(db, "users", userId);
+              const userDocRef = doc(db!, "users", userId);
               const userDocSnap = await getDoc(userDocRef);
               const legacyUuid = userDocSnap.exists() ? userDocSnap.data().legacyUuid : null;
               
