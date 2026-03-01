@@ -52,6 +52,16 @@ export default function SettlementsPage() {
           
           if (activeCompanies.length > 0) {
             setCompanies(activeCompanies);
+            setLoading(false);
+            return;
+          }
+        } catch (indexError) {
+          // collectionGroupインデックスが未作成の場合のフォールバック
+          // 全企業を取得し、クライアント側でサブスクリプション有効のもののみフィルタリング
+          console.warn("collectionGroup query failed (index may be missing), falling back to client-side filter:", indexError);
+          
+          const allSnap = await getDocs(collectionGroup(db, "company_information"));
+          const now = new Date();
           
           const companiesWithUserData = await Promise.all(
             allSnap.docs.map(async (companyDoc) => {
@@ -74,17 +84,7 @@ export default function SettlementsPage() {
           const activeCompanies = companiesWithUserData
             .filter((company: any) => {
               // legacyUuidが存在しない企業は除外
-              if (!company.legacyUui
-              const userId = doc.ref.parent.parent?.id || "";
-              return { 
-                id: doc.id, 
-                userId,
-                ...doc.data() 
-              } as any;
-            })
-            .filter((company: any) => {
-              // legacyIdが存在しない企業は除外
-              if (!company.legacyId) return false;
+              if (!company.legacyUuid) return false;
               // 課金済みかつ有効期限内のもののみ表示
               if (!company.subscriptionActive) return false;
               const expiresAt = company.subscriptionExpiresAt;
@@ -145,7 +145,7 @@ export default function SettlementsPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
                 <span className="text-gray-700 font-medium">登録企業数:</span>
-                <span className="ml-2 text-2xl font-bold text-blue-700">{Uuiompanies.length}</span>
+                <span className="ml-2 text-2xl font-bold text-blue-700">{companies.length}</span>
                 <span className="ml-1 text-gray-700">社</span>
               </div>
             </div>
@@ -156,7 +156,7 @@ export default function SettlementsPage() {
                 <div
                   key={company.id}
                   className="group bg-white rounded border-2 border-gray-300 hover:border-blue-700 transition-all overflow-hidden cursor-pointer"
-                  onClick={() => router.push(`/companies/${company.legacyId}/settlements`)}
+                  onClick={() => router.push(`/companies/${company.legacyUuid}/settlements`)}
                 >
                   {/* カードヘッダー */}
                   <div className="bg-blue-700 p-6 group-hover:bg-blue-800 transition-colors">
