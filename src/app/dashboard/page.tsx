@@ -142,6 +142,7 @@ export default function DashboardPage() {
       } else {
         // 新規登録
         const newCompanyRef = doc(collection(db, "users", userId, "company_information"));
+        
         await setDoc(newCompanyRef, {
           ...companyData,
           createdAt: Timestamp.now(),

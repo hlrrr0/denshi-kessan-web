@@ -14,6 +14,7 @@ interface UserData {
   name: string;
   email: string;
   phone: string;
+  legacyUuid?: string;
   payjpCustomerId?: string;
   payjpCardId?: string;
 }
@@ -90,6 +91,7 @@ export default function MyPage() {
           name: userDoc.name || "",
           email: userDoc.email || currentUser.email || "",
           phone: userDoc.phone || "",
+          legacyUuid: userDoc.legacyUuid || "",
           payjpCustomerId: userDoc.payjpCustomerId || "",
           payjpCardId: userDoc.payjpCardId || "",
         });
@@ -132,6 +134,7 @@ export default function MyPage() {
       if (!companySnapshot.empty) {
         const companyDoc = companySnapshot.docs[0];
         const data = companyDoc.data();
+        
         setCompanyData({
           id: companyDoc.id,
           name: data.name || "",
@@ -192,8 +195,8 @@ export default function MyPage() {
     }
   };
 
-  const settlementUrl = companyData && user
-    ? `${typeof window !== "undefined" ? window.location.origin : ""}/settlements/${user.uid}/${companyData.id}`
+  const settlementUrl = userData && userData.legacyUuid && companyData
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/companies/${userData.legacyUuid}/settlements`
     : "";
 
   const copyToClipboard = async () => {

@@ -127,13 +127,16 @@ export default function EditCompanyPage() {
       };
 
       if (companyId) {
+        // 既存の企業情報を更新
         await setDoc(doc(db, "users", userId, "company_information", companyId), companyData);
         setMessage({ type: "success", text: "会社情報を更新しました。マイページに戻ります..." });
         setTimeout(() => {
           router.push("/mypage");
         }, 2000);
       } else {
+        // 新規作成
         const newCompanyRef = doc(collection(db, "users", userId, "company_information"));
+        
         await setDoc(newCompanyRef, {
           ...companyData,
           createdAt: Timestamp.now(),
