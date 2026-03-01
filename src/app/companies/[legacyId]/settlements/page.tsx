@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { collection, query, where, getDocs, limit } from "firebase/firestore";
+import { collectionGroup, query, where, getDocs, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import SettlementDetail from "@/components/SettlementDetail";
 import Header from "@/components/Header";
@@ -32,34 +32,29 @@ export default function LegacyCompanySettlementsPage() {
       }
 
       try {
-        // usersコレクションでlegacyUuidを検索してfirebaseUidを取得
-        const usersQuery = query(
-          collection(db, "users"),
+        // company_informationからlegacyUuidで検索
+        const companiesQuery = query(
+          collectionGroup(db, "company_information"),
           where("legacyUuid", "==", legacyId),
           limit(1)
         );
         
-        const usersSnap = await getDocs(usersQuery);
+        const companiesSnap = await getDocs(companiesQuery);
 
-        if (!usersSnap.empty) {
-          const userDoc = usersSnap.docs[0];
-          const userId = userDoc.id; // Firebase UID
+        if (!companiesSnap.empty) {
+          const companyDoc = companiesSnap.docs[0];
+          const companyId = companyDoc.id;
+          // パスからuserIdを取得: users/{userId}/company_information/{docId}
+          const userId = companyDoc.ref.parent.parent?.id || "";
           
-          // そのユーザーのcompany_informationを取得
-          const companyInfoRef = collection(db, "users", userId, "company_information");
-          const companySnap = await getDocs(companyInfoRef);
-          
-          if (!companySnap.empty) {
-            const companyDoc = companySnap.docs[0];
-            const companyId = companyDoc.id;
-            
+          if (userId) {
             setIds({ userId, companyId });
           } else {
-            console.warn(`Company not found for user with legacyUuid ${legacyId}`);
+            console.warn(`Could not extract userId from company path for legacyUuid ${legacyId}`);
             setError(true);
           }
         } else {
-          console.warn(`User with legacyUuid ${legacyId} not found`);
+          console.warn(`Company with legacyUuid ${legacyId} not found`);
           setError(true);
         }
       } catch (error) {

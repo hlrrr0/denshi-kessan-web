@@ -28,24 +28,18 @@ export default function SettlementsPage() {
             where("subscriptionExpiresAt", ">", now)
           );
           const snap = await getDocs(q);
-          const companiesWithUserData = await Promise.all(
-            snap.docs.map(async (companyDoc) => {
-              // パスからuserIdを取得: users/{userId}/company_information/{docId}
-              const userId = companyDoc.ref.parent.parent?.id || "";
-              
-              // userのlegacyUuidを取得
-              const userDocRef = doc(db!, "users", userId);
-              const userDocSnap = await getDoc(userDocRef);
-              const legacyUuid = userDocSnap.exists() ? userDocSnap.data().legacyUuid : null;
-              
-              return {
-                id: companyDoc.id,
-                userId,
-                legacyUuid,
-                ...companyDoc.data()
-              };
-            })
-          );
+          const companiesWithUserData = snap.docs.map((companyDoc) => {
+            // パスからuserIdを取得: users/{userId}/company_information/{docId}
+            const userId = companyDoc.ref.parent.parent?.id || "";
+            const data = companyDoc.data();
+            
+            return {
+              id: companyDoc.id,
+              userId,
+              legacyUuid: data.legacyUuid || null,
+              ...data
+            };
+          });
           
           // legacyUuidが存在する企業のみフィルタリング
           const activeCompanies = companiesWithUserData.filter(company => company.legacyUuid);
@@ -63,23 +57,17 @@ export default function SettlementsPage() {
           const allSnap = await getDocs(collectionGroup(db, "company_information"));
           const now = new Date();
           
-          const companiesWithUserData = await Promise.all(
-            allSnap.docs.map(async (companyDoc) => {
-              const userId = companyDoc.ref.parent.parent?.id || "";
-              
-              // userのlegacyUuidを取得
-              const userDocRef = doc(db!, "users", userId);
-              const userDocSnap = await getDoc(userDocRef);
-              const legacyUuid = userDocSnap.exists() ? userDocSnap.data().legacyUuid : null;
-              
-              return {
-                id: companyDoc.id,
-                userId,
-                legacyUuid,
-                ...companyDoc.data()
-              } as any;
-            })
-          );
+          const companiesWithUserData = allSnap.docs.map((companyDoc) => {
+            const userId = companyDoc.ref.parent.parent?.id || "";
+            const data = companyDoc.data();
+            
+            return {
+              id: companyDoc.id,
+              userId,
+              legacyUuid: data.legacyUuid || null,
+              ...data
+            } as any;
+          });
           
           const activeCompanies = companiesWithUserData
             .filter((company: any) => {

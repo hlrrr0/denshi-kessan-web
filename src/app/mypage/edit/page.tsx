@@ -135,10 +135,15 @@ export default function EditCompanyPage() {
         }, 2000);
       } else {
         // 新規作成
+        // legacyUuidを取得
+        const userDoc = await getDoc(doc(db, "users", userId));
+        const legacyUuid = userDoc.exists() ? userDoc.data().legacyUuid : null;
+        
         const newCompanyRef = doc(collection(db, "users", userId, "company_information"));
         
         await setDoc(newCompanyRef, {
           ...companyData,
+          legacyUuid,
           createdAt: Timestamp.now(),
         });
         setMessage({ type: "success", text: "会社情報を登録しました。マイページに戻ります..." });
