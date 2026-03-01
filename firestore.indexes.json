@@ -9,17 +9,22 @@
           "order": "ASCENDING"
         }
       ]
-    },
+    }
+  ],
+  "fieldOverrides": [
     {
       "collectionGroup": "company_information",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
+      "fieldPath": "legacyUuid",
+      "indexes": [
         {
-          "fieldPath": "legacyUuid",
-          "order": "ASCENDING"
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
         }
       ]
     }
-  ],
-  "fieldOverrides": []
+  ]
 }
