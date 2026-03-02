@@ -3,7 +3,7 @@
 import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, setDoc, collection, getDocs, Timestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, getDocs, Timestamp } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import AuthGuard from "@/components/AuthGuard";
 import Header from "@/components/Header";
